@@ -54,14 +54,14 @@ cat <<EOF > ../config.cfg
 ROOT_DIR=$ROOT_DIR
 EOF
 
-# # initialize conda for bash
-# eval "$(conda shell.bash hook)"
+# initialize conda for bash
+eval "$(conda shell.bash hook)"
 
-# # now activate env
-# conda activate "$env"
+# now activate env
+conda activate "$env"
 
-# # Your script commands go here
-# echo "Conda environment $env is activated!"
+# Your script commands go here
+echo "Conda environment $env is activated!"
 
 process="$ROOT_DIR/python/process.py"
 split="$ROOT_DIR/python/split.py"

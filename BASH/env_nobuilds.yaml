@@ -1,0 +1,4 @@
+name: 16S_rna
+channels:
+  - defaults
+prefix: /home/jr453/anaconda3/envs/16S_rna

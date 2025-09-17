@@ -1,0 +1,128 @@
+#/bin/bash
+
+verbose="F"
+. ~/bioinf-tools/bin/utils
+
+# --- Help Function
+usage()
+{
+   # Display Help
+   separator_line "Run 16S Transformer Training Pipeline"
+   echo "                usage:                                                      "
+   echo "                example:                                                     "
+   echo "                                  -f       Path to the 16S RNA fasta file.   "
+   echo "                                  -V       Prints out the tool version.                                 "
+   echo "                                  -h       Print this Help.                                             "
+   echo "                                                                                                        "
+   separator_line
+}
+
+# Initialize variables
+# outfolder="NULL"
+
+while getopts ":hf:V" flag;
+do
+    case "${flag}" in
+        h) # Display Help Function
+              usage
+              exit;;
+        f)
+              fasta=${OPTARG}
+        ;;
+        V)
+              version="version"
+        echo $version
+        ;;
+        ?)
+          echo "Error: Invalid option. Try '-h' to see a list of available options."
+          exit;;
+        *)
+          usage
+          exit;;
+    esac
+done
+
+# Get ROOT DIR
+# pwd=$(pwd)
+# ROOT_DIR="$HOME/Documents/Projects/Reem_16s_RNA_classification"
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Create a config file
+# Write them into a plain text config
+cat <<EOF > ../config.cfg
+ROOT_DIR=$ROOT_DIR
+EOF
+
+# # initialize conda for bash
+# eval "$(conda shell.bash hook)"
+
+# # now activate env
+# conda activate "$env"
+
+# # Your script commands go here
+# echo "Conda environment $env is activated!"
+
+process="$ROOT_DIR/python/process.py"
+split="$ROOT_DIR/python/split.py"
+train="$ROOT_DIR/python/train.py"
+evaluate="$ROOT_DIR/python/evaluate.py"
+
+# ========================================
+# 1. Process FASTA files into training DFs
+# ========================================
+
+# python3 $process -f $fasta
+
+# # ========================================
+# # 2. Split files into train/test fractions
+# # ========================================
+# # Split single label data
+echo "Splitting single label data..."
+
+sldata_path="$ROOT_DIR/data/singlelabel"
+
+# for file in "$sldata_path"/*; do
+#     if [ -f "$file" ]; then
+#         echo "Processing $file..."
+#         python3 "$split" -f "$file"
+#         echo "Done!"
+#     fi
+# done
+
+# # Split multi-label data
+# echo "Splitting multi-label data..."
+
+# # mldata_path="$ROOT_DIR/data/16S_RNA/multilabel"
+
+# # for file in "$mldata_path"/*; do
+# #     if [ -f "$file" ]; then
+# #         echo "Processing $file..."
+# #         python3 "$split" -f "$file"
+# #         echo "Done!"
+# #     fi
+# # done
+
+# # ========================================
+# # 3. Train using training DFs
+# # ========================================
+# Train single-label models
+echo "Training single-label models..."
+
+for dir in "$sldata_path"; do
+  if [ -d "$dir" ]; then
+    for file in "$dir"/*.pkl; do
+      if [ -f "$file" ]; then
+        echo "Training on $file.."
+        # Your commands here, e.g. python3 "$train" -t "$file"
+        python3 "$train" -t "$file" -l "single"
+      fi
+    done
+  fi
+done
+
+# # echo "Training multi-label models..."
+
+# # file="$mldata_path/silva_multilabel/train/*.pkl"
+
+# # python3 "$train" -t $file -l "multi"

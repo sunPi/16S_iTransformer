@@ -135,8 +135,8 @@ if __name__ == "__main__":
     # fasta_file = ROOT_DIR + "data/16S_RNA/SILVA_138.2_SSURef_NR99_tax_silva.fasta"
     
     
-    n_max = 5000
-    max_len = 100
+    n_max = None  # set to None to load all
+    max_len = 1600
     
     print("Loading SILVA fasta...")
     df = load_silva_fasta(fasta_file, n_max=n_max)

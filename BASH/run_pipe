@@ -72,7 +72,7 @@ evaluate="$ROOT_DIR/python/evaluate.py"
 # 1. Process FASTA files into training DFs
 # ========================================
 
-# python3 $process -f $fasta
+python3 $process -f $fasta
 
 # # ========================================
 # # 2. Split files into train/test fractions
@@ -82,13 +82,13 @@ echo "Splitting single label data..."
 
 sldata_path="$ROOT_DIR/data/singlelabel"
 
-# for file in "$sldata_path"/*; do
-#     if [ -f "$file" ]; then
-#         echo "Processing $file..."
-#         python3 "$split" -f "$file"
-#         echo "Done!"
-#     fi
-# done
+for file in "$sldata_path"/*; do
+    if [ -f "$file" ]; then
+        echo "Processing $file..."
+        python3 "$split" -f "$file"
+        echo "Done!"
+    fi
+done
 
 # # Split multi-label data
 # echo "Splitting multi-label data..."

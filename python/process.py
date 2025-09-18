@@ -144,12 +144,12 @@ if __name__ == "__main__":
     print(df.shape)
     
     # per-level
-    out_prefix = ROOT_DIR + "/data/singlelabel/silva"
+    out_prefix = ROOT_DIR + "/data/16S_RNA/singlelabel/silva"
     os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
     single_label_dfs = build_single_label_dfs(df, out_prefix=out_prefix, max_len=max_len)
 
     # multi-label
-    out_prefix = ROOT_DIR + "/data/multilabel/silva_multilabel"
+    out_prefix = ROOT_DIR + "/data/16S_RNA/multilabel/silva_multilabel"
     os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
     multilabel_df = build_multilabel_df(df, max_len=max_len, out_file_prefix=out_prefix)
 

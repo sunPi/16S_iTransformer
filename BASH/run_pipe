@@ -101,7 +101,7 @@ fi
 # ========================================
 
 echo "Processing FASTA file..."
-# python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH
+python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH
 
 # # ========================================
 # # 2. Split files into train/test fractions
@@ -111,13 +111,13 @@ echo "Splitting single label data..."
 
 sldata_path="$ROOT_DIR/data/16S_RNA/singlelabel"
 
-# for file in "$sldata_path"/*; do
-#     if [ -f "$file" ]; then
-#         echo "Processing $file..."
-#         python3 "$split" -f "$file"
-#         echo "Done!"
-#     fi
-# done
+for file in "$sldata_path"/*; do
+    if [ -f "$file" ]; then
+        echo "Processing $file..."
+        python3 "$split" -f "$file"
+        echo "Done!"
+    fi
+done
 
 # # Split multi-label data
 # echo "Splitting multi-label data..."

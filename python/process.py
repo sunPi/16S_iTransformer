@@ -120,6 +120,8 @@ if __name__ == "__main__":
     # Set up argument parser
     parser = argparse.ArgumentParser(description="16S RNA Transformer - Process")
     parser.add_argument('-f', '--fasta', type=str, required=True, help='File path for input data in fasta format.')
+    parser.add_argument('-n', '--n_max', type=int, required=True, default=None, help='Maximum number of sequences to process.')
+    parser.add_argument('-l', '--max_length', type=int, required=True, default=1600, help='Maximum length of sequences to process.')
     
     # Parse arguments
     args = parser.parse_args()
@@ -134,9 +136,11 @@ if __name__ == "__main__":
     fasta_file = ROOT_DIR + "/" +  args.fasta
     # fasta_file = ROOT_DIR + "data/16S_RNA/SILVA_138.2_SSURef_NR99_tax_silva.fasta"
     
+    n_max = args.n_max
+    max_len = args.max_length
     
-    n_max = None  # set to None to load all
-    max_len = 1600
+    # n_max = None  # set to None to load all
+    # max_len = 1600
     
     print("Loading SILVA fasta...")
     df = load_silva_fasta(fasta_file, n_max=n_max)

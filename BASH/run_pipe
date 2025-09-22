@@ -8,11 +8,13 @@ usage()
 {
    # Display Help
    separator_line "Run 16S Transformer Training Pipeline"
-   echo "                usage:                                                      "
-   echo "                example:                                                     "
-   echo "                                  -f       Path to the 16S RNA fasta file.   "
-   echo "                                  -V       Prints out the tool version.                                 "
-   echo "                                  -h       Print this Help.                                             "
+   echo "                usage:                                                             "
+   echo "                example:                                                           "
+   echo "                                  -f       Path to the 16S RNA fasta file.         "
+   echo "                                  -n       Maximum number of sequences to process. "
+   echo "                                  -l       Maximum length of sequences to process. "
+   echo "                                  -V       Prints out the tool version.            "
+   echo "                                  -h       Print this Help.                        "
    echo "                                                                                                        "
    separator_line
 }
@@ -20,14 +22,20 @@ usage()
 # Initialize variables
 # outfolder="NULL"
 
-while getopts ":hf:V" flag;
+while getopts ":hf:n:l:V" flag;
 do
     case "${flag}" in
         h) # Display Help Function
               usage
               exit;;
         f)
-              fasta=${OPTARG}
+              FASTA=${OPTARG}
+        ;;
+        n)
+              N_MAX=${OPTARG}
+        ;;
+        l)
+              MAX_LENGTH=${OPTARG}
         ;;
         V)
               version="version"
@@ -42,37 +50,58 @@ do
     esac
 done
 
-# Get ROOT DIR
-# pwd=$(pwd)
-# ROOT_DIR="$HOME/Documents/Projects/Reem_16s_RNA_classification"
+# ========================================
+# Preprocess
+# ========================================
+# # initialize conda for bash
+# eval "$(conda shell.bash hook)"
 
+# # now activate env
+# conda activate "$env"
+
+# # Your script commands go here
+# echo "Conda environment $env is activated!"
+
+# Get ROOT DIR
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Create a config file
 # Write them into a plain text config
-cat <<EOF > ../config.cfg
+cat <<EOF > "$ROOT_DIR/config.cfg"
 ROOT_DIR=$ROOT_DIR
 EOF
 
-# initialize conda for bash
-eval "$(conda shell.bash hook)"
-
-# now activate env
-conda activate "$env"
-
-# Your script commands go here
-echo "Conda environment $env is activated!"
-
+# Define paths to scripts
 process="$ROOT_DIR/python/process.py"
 split="$ROOT_DIR/python/split.py"
-train="$ROOT_DIR/python/train.py"
+train="$ROOT_DIR/python/train_transformer.py"
 evaluate="$ROOT_DIR/python/evaluate.py"
+
+# # Download SILVA 138.2 SSURef NR99 fasta file if not already present
+# wget -P $ROOT_DIR/data/16S_RNA/ https://www.arb-silva.de/fileadmin/silva_databases/current/Exports/SILVA_138.2_SSURef_NR99_tax_silva.fasta.gz
+
+# # Unzip the file if not already unzipped
+# if [ ! -f "$ROOT_DIR/data/16S_RNA/SILVA_138.2_SSURef_NR99_tax_silva.fasta" ]; then
+#     gunzip $ROOT_DIR/data/16S_RNA/SILVA_138.2_SSURef_NR99_tax_silva.fasta.gz
+# fi
+
+# Set default values if not provided
+if [ -z "$N_MAX" ]; then
+    N_MAX=10000
+    echo "No maximum number of sequences provided. Using default: $N_MAX"
+fi
+
+if [ -z "$MAX_LENGTH" ]; then
+    MAX_LENGTH=1600
+    echo "No maximum sequence length provided. Using default: $MAX_LENGTH"
+fi
 
 # ========================================
 # 1. Process FASTA files into training DFs
 # ========================================
 
-python3 $process -f $fasta
+echo "Processing FASTA file..."
+# python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH
 
 # # ========================================
 # # 2. Split files into train/test fractions
@@ -80,15 +109,15 @@ python3 $process -f $fasta
 # # Split single label data
 echo "Splitting single label data..."
 
-sldata_path="$ROOT_DIR/data/singlelabel"
+sldata_path="$ROOT_DIR/data/16S_RNA/singlelabel"
 
-for file in "$sldata_path"/*; do
-    if [ -f "$file" ]; then
-        echo "Processing $file..."
-        python3 "$split" -f "$file"
-        echo "Done!"
-    fi
-done
+# for file in "$sldata_path"/*; do
+#     if [ -f "$file" ]; then
+#         echo "Processing $file..."
+#         python3 "$split" -f "$file"
+#         echo "Done!"
+#     fi
+# done
 
 # # Split multi-label data
 # echo "Splitting multi-label data..."

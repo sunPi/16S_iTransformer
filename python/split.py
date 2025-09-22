@@ -55,11 +55,37 @@ test_size = len(df) - train_size
 y = df["Y"]
 
 # Group classes with count < 2 into 'other' 
+# threshold = 2
+# counts = y.value_counts()
+# rare_classes = counts[counts < threshold].index
+# df['label'] = df['Y'].replace(rare_classes, 'Other')
+# y = df['label']
+
+# Step 1: Group rare classes into 'Other'
 threshold = 2
 counts = y.value_counts()
 rare_classes = counts[counts < threshold].index
 df['label'] = df['Y'].replace(rare_classes, 'Other')
 y = df['label']
+
+# Step 2: Drop any classes (including 'Other') with < 2 samples
+try:
+    counts = y.value_counts()
+    valid_classes = counts[counts >= 2].index
+    before = len(df)
+    df = df[df['label'].isin(valid_classes)]
+    y = df['label']
+    after = len(df)
+
+    if after < before:
+        print(f"Dropped {before - after} rows from singleton classes.")
+    if df.empty:
+        raise ValueError("All rows were dropped after filtering singleton classes.")
+except Exception as e:
+    print(f"⚠️ Warning while filtering singleton classes: {e}")
+    print("Proceeding without filtering.")
+    y = df['label']
+
 
 # Split into train (80%) and test (20%)
 train_df, test_df = train_test_split(df, test_size=0.2, stratify=y, random_state=42, shuffle=True)

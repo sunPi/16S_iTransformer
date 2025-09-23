@@ -20,6 +20,34 @@ import seaborn as sns
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 from pathlib import Path
+from utils import load_cfg
+import os
+import argparse
+
+# Set up argument parser
+parser = argparse.ArgumentParser(description="16S RNA Transformer - Evaluate")
+parser.add_argument('-m', '--model_path', type=str, required=True, help='File path to the model directory.')
+
+# Parse arguments
+args = parser.parse_args()
+
+# Load label encoder
+# data_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/Reem_Taxonomy_Challenge/results/models/single/16s_transformer/silva_class/"
+# label       = "silva_class"
+# config    = load_cfg("/home/jr453/Documents/Projects/Reem_16s_RNA_classification/Reem_Taxonomy_Challenge/config.cfg")
+model_dir = args.model_path
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+cfg_path   = os.path.dirname(script_dir) + "/config.cfg"
+config = load_cfg(cfg_path)
+
+ROOT_DIR = config["ROOT_DIR"]
+
+label    = config["LABEL"]
+dname    = config["TAXA"]
+
+# model_dir = Path(ROOT_DIR, 'results', 'models', 'single', '16s_transformer', label)
+file             = "test_" + dname + ".pkl"
 
 # ========================
 # 1. Load model + encoder
@@ -44,29 +72,30 @@ class SimpleTransformerClassifier(nn.Module):
         x = x.squeeze(0)
         return self.classifier(x)
 
-# Load label encoder
-ROOT_DIR = Path("/home/jr453/Documents/Projects/Reem_16s_RNA_classification/")
-label          = "silva_species"
-model_dir = Path(ROOT_DIR, 'results', 'models', 'single', '16s_transformer', label)
-file             = "test_" + label + ".pkl"
-
-
 with open(Path(model_dir, 'label_encoder.pkl'), "rb") as f:
     le: LabelEncoder = pickle.load(f)
 
 num_labels = len(le.classes_)
 
 # Load evaluation dataset (50 cut sequences, pickled/CSV format)
-eval_file = Path(ROOT_DIR, 'data', 'singlelabel', label , 'test', file)  # replace with your held-out 50 seqs
+eval_file = Path(ROOT_DIR, 'data', '16S_RNA', 'singlelabel', dname , 'test', file)  # replace with your held-out 50 seqs
 
 if eval_file.as_posix().endswith(".pkl"):
     df_eval = pickle.load(open(eval_file, "rb"))
 else:
     df_eval = pd.read_csv(eval_file)
 
+seen_labels = set(le.classes_)
+df_eval_filtered = df_eval[df_eval["Y"].isin(seen_labels)]
+
+# Now transform safely
 feature_cols = [c for c in df_eval.columns if c.startswith("X")]
-X_eval = df_eval[feature_cols].to_numpy(dtype=np.float32)
-y_eval = le.transform(df_eval["Y"])  # encode with same label encoder
+X_eval = df_eval_filtered[feature_cols].to_numpy(dtype=np.float32)
+y_eval = le.transform(df_eval_filtered["Y"])
+
+# feature_cols = [c for c in df_eval.columns if c.startswith("X")]
+# X_eval = df_eval[feature_cols].to_numpy(dtype=np.float32)
+# y_eval = le.transform(df_eval["Y"])  # encode with same label encoder
 
 X_eval = torch.tensor(X_eval, dtype=torch.float32)
 y_eval = torch.tensor(y_eval, dtype=torch.long)
@@ -120,16 +149,25 @@ print(f"F1-score:  {f1:.4f}")
 # 6. Barplot of Metrics
 # ========================
 metrics = {
-    "Accuracy": acc,
-    "Precision": prec,
-    "Recall": rec,
-    "F1-score": f1
+    "Accuracy": round(acc,4),
+    "Precision": round(prec,4),
+    "Recall": round(rec,4),
+    "F1-score": round(f1,4)
 }
+
+csv_file = Path(model_dir, "metrics.csv")
+
+# Convert dictionary to DataFrame (single row)
+df = pd.DataFrame([metrics])
+
+# Save to CSV
+df.to_csv(csv_file, index=False)
+
 plt.figure(figsize=(8, 6))
-sns.barplot(x=list(metrics.keys()), y=list(metrics.values()), palette="viridis")
 plt.ylim(0, 1.05)
 plt.ylabel("Score")
 plt.title("Evaluation Metrics - 16S Transformer on " + label)
+sns.barplot(x=list(metrics.keys()), y=list(metrics.values()), palette="viridis")
 plt.tight_layout()
 plt.savefig(Path(model_dir, 'metrics_barplot.png'), dpi=300)
-plt.show()
+# plt.show()

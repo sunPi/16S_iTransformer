@@ -63,6 +63,20 @@ le = LabelEncoder()
 y_enc = le.fit_transform(y)
 num_labels = len(le.classes_)
 
+def update_config(config_file: str, config_dict: dict):
+    """
+    Write a dictionary to a config file in KEY=VALUE format.
+
+    Args:
+        config_file (str): Path to the config file.
+        config_dict (dict): Dictionary of variables to write.
+    """
+    config_file = Path(config_file)
+    with open(config_file, "w") as f:
+        for key, value in config_dict.items():
+            f.write(f"{key}={value}\n")
+    print(f"Config saved to {config_file}")
+    
 # ========================
 # 2. Dataset class
 # ========================
@@ -161,11 +175,17 @@ for epoch in range(num_epochs):
 # 5. Save model + label encoder
 # ========================
 script_dir = os.path.dirname(os.path.abspath(__file__))
-config = load_cfg(os.path.dirname(script_dir) + "/config.cfg")
+cfg_path   = os.path.dirname(script_dir) + "/config.cfg"
+config = load_cfg(cfg_path)
 
 ROOT_DIR   = config["ROOT_DIR"]
 split_path = data_file.split('/')
 dname      = [x for x in split_path if x.startswith('silva_')][0]
+
+config["LABEL"] = args.label
+config["TAXA"]  = dname
+
+update_config(config_file=cfg_path, config_dict=config)
 
 model_dir = Path(ROOT_DIR, 'results', 'models', label, '16s_transformer', dname)
 
@@ -176,3 +196,6 @@ with open(Path(model_dir, "label_encoder.pkl"), "wb") as f:
     pickle.dump(le, f)
 
 print("✅ Training finished, model saved in " + model_dir.as_posix())
+
+# Print the path to stdout
+print(model_dir.as_posix())

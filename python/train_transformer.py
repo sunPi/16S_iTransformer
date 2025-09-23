@@ -41,8 +41,10 @@ args = parser.parse_args()
 # ========================
 # 1. Load data (Pickle or CSV)
 # ========================
-# data_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/data/singlelabel/silva_class/train/train_silva_class.pkl"  # or .csv
+# data_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/Reem_Taxonomy_Challenge/data/16S_RNA/singlelabel/silva_species/train/train_silva_species.pkl"
 # label       = "singlelabel"
+# config    = load_cfg("/home/jr453/Documents/Projects/Reem_16s_RNA_classification/Reem_Taxonomy_Challenge/config.cfg")
+
 data_file = args.trdata
 label       = args.label
 
@@ -161,13 +163,14 @@ for epoch in range(num_epochs):
 script_dir = os.path.dirname(os.path.abspath(__file__))
 config = load_cfg(os.path.dirname(script_dir) + "/config.cfg")
 
-ROOT_DIR = config["ROOT_DIR"]
-dname = data_file.split('/')[8]
+ROOT_DIR   = config["ROOT_DIR"]
+split_path = data_file.split('/')
+dname      = [x for x in split_path if x.startswith('silva_')][0]
+
 model_dir = Path(ROOT_DIR, 'results', 'models', label, '16s_transformer', dname)
 
 os.makedirs(model_dir, exist_ok=True)
 
-os.makedirs(model_dir, exist_ok=True)
 torch.save(model.state_dict(), Path(model_dir, "model.pth"))
 with open(Path(model_dir, "label_encoder.pkl"), "wb") as f:
     pickle.dump(le, f)

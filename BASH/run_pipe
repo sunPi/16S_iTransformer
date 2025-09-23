@@ -53,15 +53,6 @@ done
 # ========================================
 # Preprocess
 # ========================================
-# # initialize conda for bash
-# eval "$(conda shell.bash hook)"
-
-# # now activate env
-# conda activate "$env"
-
-# # Your script commands go here
-# echo "Conda environment $env is activated!"
-
 # Get ROOT DIR
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -75,6 +66,7 @@ EOF
 process="$ROOT_DIR/python/process.py"
 split="$ROOT_DIR/python/split.py"
 train="$ROOT_DIR/python/train_transformer.py"
+gen_model_dir="$ROOT_DIR/python/generate_model_dir.py"
 evaluate="$ROOT_DIR/python/evaluate.py"
 
 # # Download SILVA 138.2 SSURef NR99 fasta file if not already present
@@ -119,6 +111,33 @@ for file in "$sldata_path"/*; do
     fi
 done
 
+# # ========================================
+# # 3. Train using training DFs
+# # ========================================
+# Train single-label models
+echo "Training single-label models..."
+
+sldata_path="$ROOT_DIR/data/16S_RNA/singlelabel"
+
+for dir in "$sldata_path"/*; do
+  if [ -d "$dir" ]; then
+    for file in "$dir"/train/*.pkl; do
+      if [ -f "$file" ]; then
+        echo "Training on $file.."
+        # Your commands here, e.g. python3 "$train" -t "$file"
+        python3 "$train" -t "$file" -l "single"
+        MODEL_DIR=$(python3 "$gen_model_dir")
+
+        python3 "$evaluate" -m "$MODEL_DIR"
+      fi
+    done
+  fi
+done
+
+
+
+
+# CODE TO RECYCLE
 # # Split multi-label data
 # echo "Splitting multi-label data..."
 
@@ -131,24 +150,6 @@ done
 # #         echo "Done!"
 # #     fi
 # # done
-
-# # ========================================
-# # 3. Train using training DFs
-# # ========================================
-# Train single-label models
-echo "Training single-label models..."
-
-for dir in "$sldata_path"; do
-  if [ -d "$dir" ]; then
-    for file in "$dir"/*.pkl; do
-      if [ -f "$file" ]; then
-        echo "Training on $file.."
-        # Your commands here, e.g. python3 "$train" -t "$file"
-        python3 "$train" -t "$file" -l "single"
-      fi
-    done
-  fi
-done
 
 # # echo "Training multi-label models..."
 

@@ -111,7 +111,7 @@ fi
 # ========================================
 
 echo "Processing FASTA file..."
-# python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH
+python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH
 
 # # ========================================
 # # 2. Split files into train/test fractions

@@ -13,6 +13,7 @@ usage()
    echo "                                  -f       Path to the 16S RNA fasta file.         "
    echo "                                  -n       Maximum number of sequences to process. "
    echo "                                  -l       Maximum length of sequences to process. "
+   echo "                                  -t       Specify which training algorithm to use. [Options: 'itransformer', 'xgb', 'graph']"
    echo "                                  -V       Prints out the tool version.            "
    echo "                                  -h       Print this Help.                        "
    echo "                                                                                                        "
@@ -22,7 +23,7 @@ usage()
 # Initialize variables
 # outfolder="NULL"
 
-while getopts ":hf:n:l:V" flag;
+while getopts ":hf:n:l:t:V" flag;
 do
     case "${flag}" in
         h) # Display Help Function
@@ -36,6 +37,9 @@ do
         ;;
         l)
               MAX_LENGTH=${OPTARG}
+        ;;
+        t)
+              TRAINING_ALGO=${OPTARG}
         ;;
         V)
               version="version"
@@ -65,7 +69,6 @@ EOF
 # Define paths to scripts
 process="$ROOT_DIR/python/process.py"
 split="$ROOT_DIR/python/split.py"
-train="$ROOT_DIR/python/train_transformer.py"
 gen_model_dir="$ROOT_DIR/python/generate_model_dir.py"
 evaluate="$ROOT_DIR/python/evaluate.py"
 
@@ -87,13 +90,28 @@ if [ -z "$MAX_LENGTH" ]; then
     MAX_LENGTH=1600
     echo "No maximum sequence length provided. Using default: $MAX_LENGTH"
 fi
+if [ "$TRAINING_ALGO" = "itransformer" ]; then 
+    echo "Using iTransformer as the training algorithm."
+    train="$ROOT_DIR/python/train_transformer.py"
 
+elif [ "$TRAINING_ALGO" = "xgb" ]; then 
+    echo "Using XGBoost as the training algorithm."
+    train="$ROOT_DIR/python/train_xgb.py"
+
+elif [ "$TRAINING_ALGO" = "graph" ]; then 
+    echo "Using Graph Neural Network as the training algorithm."
+    train="$ROOT_DIR/python/train_grapple.py"
+
+else 
+    TRAINING_ALGO="itransformer"
+    echo "No valid training algorithm provided. Using default: $TRAINING_ALGO"
+fi
 # ========================================
 # 1. Process FASTA files into training DFs
 # ========================================
 
 echo "Processing FASTA file..."
-python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH
+# python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH
 
 # # ========================================
 # # 2. Split files into train/test fractions
@@ -129,12 +147,12 @@ for dir in "$sldata_path"/*; do
         MODEL_DIR=$(python3 "$gen_model_dir")
 
         python3 "$evaluate" -m "$MODEL_DIR"
+
+        
       fi
     done
   fi
 done
-
-
 
 
 # CODE TO RECYCLE

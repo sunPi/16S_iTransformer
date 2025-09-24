@@ -96,7 +96,7 @@ if [ "$TRAINING_ALGO" = "itransformer" ]; then
 
 elif [ "$TRAINING_ALGO" = "xgb" ]; then 
     echo "Using XGBoost as the training algorithm."
-    train="$ROOT_DIR/python/train_xgb.py"
+    train="$ROOT_DIR/python/train_XGB.py"
 
 elif [ "$TRAINING_ALGO" = "graph" ]; then 
     echo "Using Graph Neural Network as the training algorithm."

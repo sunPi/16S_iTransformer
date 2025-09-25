@@ -41,6 +41,7 @@ In case the PyTorch packages fail to install, please follow instructions from ht
 
 The pipeline is controlled via the run_pipe script, which provides a command-line interface powered by docopt.
 
+```bash
 General Syntax:
 ./run_pipe <command> [options]
 

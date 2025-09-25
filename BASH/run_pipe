@@ -14,6 +14,7 @@ usage()
    echo "                                  -n       Maximum number of sequences to process. "
    echo "                                  -l       Maximum length of sequences to process. "
    echo "                                  -t       Specify which training algorithm to use. [Options: 'itransformer', 'xgb', 'graph']"
+   echo "                                  -i       Specify if incremental learning is using class native or expansion. [Options: 'native', 'expansion']"
    echo "                                  -V       Prints out the tool version.            "
    echo "                                  -h       Print this Help.                        "
    echo "                                                                                                        "
@@ -40,6 +41,9 @@ do
         ;;
         t)
               TRAINING_ALGO=${OPTARG}
+        ;;
+        i)
+              INCREMENTAL_TYPE=${OPTARG}
         ;;
         V)
               version="version"
@@ -106,6 +110,7 @@ else
     TRAINING_ALGO="itransformer"
     echo "No valid training algorithm provided. Using default: $TRAINING_ALGO"
 fi
+
 # ========================================
 # 1. Process FASTA files into training DFs
 # ========================================
@@ -129,9 +134,9 @@ for file in "$sldata_path"/*; do
     fi
 done
 
-# # ========================================
-# # 3. Train using training DFs
-# # ========================================
+# ========================================
+# 3. Train using training DFs
+# ========================================
 # Train single-label models
 echo "Training single-label models..."
 
@@ -153,6 +158,33 @@ for dir in "$sldata_path"/*; do
     done
   fi
 done
+
+# ========================================
+# 4. (Optional) Class Expansion Incremental Learning
+# ========================================
+echo "Starting Class Expansion Incremental Learning..."
+
+ilearn="$ROOT_DIR/python/train_increment.py"
+
+if [ -z "$INCREMENTAL_TYPE" ]; then
+    INCREMENTAL_TYPE="native"
+    echo "No incremental learning type provided. Using default: $INCREMENTAL_TYPE"
+fi
+
+elif [ "$INCREMENTAL_TYPE" = "native" ]; then 
+    echo "Using class native incremental learning."
+
+    python3 "$ilearn" -t new_batch.pkl -m model.pth -l label_encoder.pkl -o updated_model
+
+elif [ "$INCREMENTAL_TYPE" = "expansion" ]; then 
+    echo "Using class expansion incremental learning."
+
+    python3 "$ilearn" -t new_batch.pkl -m model.pth -l label_encoder.pkl -o updated_model -e
+
+else 
+    INCREMENTAL_TYPE="native"
+    echo "No valid incremental learning type provided. Using default: $INCREMENTAL_TYPE"
+fi
 
 
 # CODE TO RECYCLE

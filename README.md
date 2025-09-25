@@ -34,4 +34,26 @@ conda activate reem16s
 This pipeline relies on successfull installation of PyTorch modules with GPU support (together with the correct Nvidia CUDA version).
 In case the PyTorch packages fail to install, please follow instructions from https://pytorch.org/get-started/locally/
 
+## 🚀 Usage
+
+The pipeline is controlled via the run_pipe script, which provides a command-line interface powered by docopt.
+
+General Syntax:
+./run_pipe <command> [options]
+
+Minimal working example:
+
+1. Download the SILVA training data (~500.000 samples) and uncompress it from:
+
+https://www.arb-silva.de/fileadmin/silva_databases/current/Exports/SILVA_138.2_SSURef_NR99_tax_silva.fasta.gz
+
+2. Put it inside your repository under data/16S_RNA/
+
+3. Run the pipeline using your favorite terminal. In Linux use bash like this:
+
+cd 16S_iTransformer
+
+./BASH/run_pipe -f data/16S_RNA/SILVA_138.2_SSURef_NR99_tax_silva.fasta -n 5000 -l 100 -t 'itransformer'
+
+
 

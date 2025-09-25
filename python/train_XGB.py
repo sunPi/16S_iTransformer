@@ -13,7 +13,7 @@ from pathlib import Path
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from xgboost import XGBClassifier
-from utils import load_cfg
+from utils import *
 
 # ==============
 # 1. Parse args
@@ -53,27 +53,13 @@ feature_cols = [c for c in df.columns if c.startswith("X")]
 X = df[feature_cols].to_numpy(dtype=np.float32)
 y = df["Y"].to_numpy()
 
+# Encode labels
 le = LabelEncoder()
 y_enc = le.fit_transform(y)
 num_labels = len(le.classes_)
 
-# Train/test split
-n = len(X)
-split = int(0.8 * n)
-X_train, X_test = X[:split], X[split:]
-y_train, y_test = y_enc[:split], y_enc[split:]
-
-le = LabelEncoder()
-y_train_enc = le.fit_transform(y_train)
-y_test_enc = le.transform(y_test)
-
-# y_train_corrected = y_train - y_train.min()
-# y_test_corrected = y_test - y_train.min()
-
-# num_labels = y_train_corrected.max() + 1
-
 # ==============
-# 3. XGBoost
+# 3. Train model
 # ==============
 model = XGBClassifier(
     objective="multi:softmax",
@@ -87,31 +73,25 @@ model = XGBClassifier(
     verbosity=1,
 )
 
-num_labels = len(le.classes_)
-
-model.fit(X_train, y_train_enc, verbose=True)
-
-y_pred_enc = model.predict(X_test)
-y_pred = le.inverse_transform(y_pred_enc)  # back to original labels
-
-# model.fit(X_train, y_train)
-# y_pred = model.predict(X_test)
-
-# Metrics
-acc = accuracy_score(y_test, y_pred)
-prec, rec, f1, _ = precision_recall_fscore_support(y_test, y_pred, average="weighted")
-
-print(f"✅ XGBoost results: Acc={acc:.4f}, Prec={prec:.4f}, Rec={rec:.4f}, F1={f1:.4f}")
+model.fit(X, y_enc, verbose=True)
 
 # ==============
-# 4. Save
+# 4. Save model
 # ==============
 script_dir = os.path.dirname(os.path.abspath(__file__))
-config = load_cfg(os.path.dirname(script_dir) + "/config.cfg")
-ROOT_DIR = config["ROOT_DIR"]
+cfg_path   = os.path.dirname(script_dir) + "/config.cfg"
+config     = load_cfg(cfg_path)
+ROOT_DIR   = config["ROOT_DIR"]
 
 split_path = data_file.split('/')
 dname      = [x for x in split_path if x.startswith('silva_')][0]
+
+
+config["LABEL"] = args.label
+config["TAXA"]  = dname
+
+update_config(config_file=cfg_path, config_dict=config)
+
 model_dir = Path(ROOT_DIR, 'results', 'models', label, 'xgboost', dname)
 
 os.makedirs(model_dir, exist_ok=True)
@@ -122,4 +102,3 @@ with open(Path(model_dir, "label_encoder.pkl"), "wb") as f:
     pickle.dump(le, f)
 
 print("✅ XGBoost model saved to " + model_dir.as_posix())
-

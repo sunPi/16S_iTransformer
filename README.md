@@ -34,6 +34,9 @@ conda activate reem16s
 This pipeline relies on successfull installation of PyTorch modules with GPU support (together with the correct Nvidia CUDA version).
 In case the PyTorch packages fail to install, please follow instructions from https://pytorch.org/get-started/locally/
 
+```
+
+---
 ## 🚀 Usage
 
 The pipeline is controlled via the run_pipe script, which provides a command-line interface powered by docopt.
@@ -41,6 +44,7 @@ The pipeline is controlled via the run_pipe script, which provides a command-lin
 General Syntax:
 ./run_pipe <command> [options]
 
+```bash
 Minimal working example:
 
 1. Download the SILVA training data (~500.000 samples) and uncompress it from:

@@ -60,5 +60,8 @@ cd 16S_iTransformer
 
 ./BASH/run_pipe -f data/16S_RNA/SILVA_138.2_SSURef_NR99_tax_silva.fasta -n 5000 -l 100 -t 'itransformer'
 
+Link to binder demo
+https://hub.2i2c.mybinder.org/user/sunpi-16s_itransformer-fwt8lubs/lab/tree/demo.ipynb
+
 
 

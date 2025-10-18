@@ -100,28 +100,39 @@ if __name__ == "__main__":
 
     model, le = train_on_batches(batch_files, num_epochs=args.epochs, device=device)
     
-    # Load in script dir and config file    
+    # out_dir = Path(batch_dir, "trained_models")
+    # out_dir.mkdir(exist_ok=True)
+    # torch.save(model.state_dict(), out_dir / f"{args.label}_transformer.pth")
+    # with open(out_dir / f"{args.label}_label_encoder.pkl", "wb") as f:
+    #     pickle.dump(le, f)
+
+    # print(f"✅ Training finished, model saved in {out_dir}")
+
+    # ========================
+    # 5. Save model + label encoder
+    # ========================
     script_dir = os.path.dirname(os.path.abspath(__file__))
     cfg_path   = os.path.dirname(script_dir) + "/config.cfg"
-    config     = load_cfg(cfg_path)
+    config = load_cfg(cfg_path)
     
     ROOT_DIR   = config["ROOT_DIR"]
     split_path = data_file.split('/')
     dname      = [x for x in split_path if x.startswith('silva_')][0]
-
+    
     config["LABEL"] = args.label
     config["TAXA"]  = dname
-
+    
     update_config(config_file=cfg_path, config_dict=config)
-
+    
     model_dir = Path(ROOT_DIR, 'results', 'models', label, '16s_transformer', dname)
-
+    
     os.makedirs(model_dir, exist_ok=True)
     
-    out_dir = Path(batch_dir, "trained_models")
-    out_dir.mkdir(exist_ok=True)
-    torch.save(model.state_dict(), out_dir / f"{args.label}_transformer.pth")
-    with open(out_dir / f"{args.label}_label_encoder.pkl", "wb") as f:
+    torch.save(model.state_dict(), Path(model_dir, "model.pth"))
+    with open(Path(model_dir, "label_encoder.pkl"), "wb") as f:
         pickle.dump(le, f)
-
-    print(f"✅ Training finished, model saved in {out_dir}")
+    
+    print("✅ Training finished, model saved in " + model_dir.as_posix())
+    
+    # Print the path to stdout
+    print(model_dir.as_posix())

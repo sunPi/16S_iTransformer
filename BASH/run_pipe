@@ -129,7 +129,6 @@ echo "Processing FASTA file..."
 # python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH
 python3 $process -f $FASTA -b $BATCH_SIZE -n $N_MAX -l $MAX_LENGTH
 
-
 # # ========================================
 # # 2. Split files into train/test fractions
 # # ========================================
@@ -179,8 +178,7 @@ echo "Starting Class Expansion Incremental Learning..."
 ilearn="$ROOT_DIR/python/train_increment.py"
 
 if [ -z "$INCREMENTAL_TYPE" ]; then
-    INCREMENTAL_TYPE="native"
-    echo "No incremental learning type provided. Using default: $INCREMENTAL_TYPE"
+    echo "No incremental learning type provided. Skipping incremental learning step."
 fi
 
 elif [ "$INCREMENTAL_TYPE" = "native" ]; then 
@@ -218,7 +216,3 @@ fi
 # # file="$mldata_path/silva_multilabel/train/*.pkl"
 
 # # python3 "$train" -t $file -l "multi"
-
-
-# Train across all generated batch files (e.g., species level)
-python train_transformer_batches.py -p data/16S_RNA/singlelabel -l species -e 5

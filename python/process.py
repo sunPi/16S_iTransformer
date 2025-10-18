@@ -131,7 +131,7 @@ if __name__ == "__main__":
     config = load_cfg(os.path.dirname(os.path.abspath(__file__)) + "/../config.cfg")
     ROOT_DIR = config["ROOT_DIR"]
     fasta_path = os.path.join(ROOT_DIR, args.fasta)
-    out_prefix = os.path.join(ROOT_DIR, "data/singlelabel/silva")
+    out_prefix = os.path.join(ROOT_DIR, "data/16S_RNA/singlelabel/silva")
 
     if args.batch_size:
         print(f"⚙️ Running in BATCH mode (batch size = {args.batch_size})")

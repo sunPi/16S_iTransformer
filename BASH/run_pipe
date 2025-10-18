@@ -15,6 +15,7 @@ usage()
    echo "                                  -l       Maximum length of sequences to process. "
    echo "                                  -t       Specify which training algorithm to use. [Options: 'itransformer', 'xgb', 'graph']"
    echo "                                  -i       Specify if incremental learning is using class native or expansion. [Options: 'native', 'expansion']"
+   echo "                                  -b       Specify the batch size for training. [Default: 32]"
    echo "                                  -V       Prints out the tool version.            "
    echo "                                  -h       Print this Help.                        "
    echo "                                                                                                        "
@@ -24,7 +25,7 @@ usage()
 # Initialize variables
 # outfolder="NULL"
 
-while getopts ":hf:n:l:t:V" flag;
+while getopts ":hf:n:l:t:b:V" flag;
 do
     case "${flag}" in
         h) # Display Help Function
@@ -44,6 +45,9 @@ do
         ;;
         i)
               INCREMENTAL_TYPE=${OPTARG}
+        ;; 
+        b)
+              BATCH_SIZE=${OPTARG}
         ;;
         V)
               version="version"
@@ -94,6 +98,12 @@ if [ -z "$MAX_LENGTH" ]; then
     MAX_LENGTH=1600
     echo "No maximum sequence length provided. Using default: $MAX_LENGTH"
 fi
+
+if [ -z "$BATCH_SIZE" ]; then
+    BATCH_SIZE="None"
+    echo "No batch size provided. Using default: $BATCH_SIZE"
+fi
+
 if [ "$TRAINING_ALGO" = "itransformer" ]; then 
     echo "Using iTransformer as the training algorithm."
     train="$ROOT_DIR/python/train_transformer.py"
@@ -116,7 +126,9 @@ fi
 # ========================================
 
 echo "Processing FASTA file..."
-python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH
+# python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH
+python3 $process -f $FASTA -b $BATCH_SIZE -n $N_MAX -l $MAX_LENGTH
+
 
 # # ========================================
 # # 2. Split files into train/test fractions
@@ -206,3 +218,7 @@ fi
 # # file="$mldata_path/silva_multilabel/train/*.pkl"
 
 # # python3 "$train" -t $file -l "multi"
+
+
+# Train across all generated batch files (e.g., species level)
+python train_transformer_batches.py -p data/16S_RNA/singlelabel -l species -e 5

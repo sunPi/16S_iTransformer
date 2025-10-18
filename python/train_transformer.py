@@ -99,7 +99,25 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model, le = train_on_batches(batch_files, num_epochs=args.epochs, device=device)
+    
+    # Load in script dir and config file    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    cfg_path   = os.path.dirname(script_dir) + "/config.cfg"
+    config     = load_cfg(cfg_path)
+    
+    ROOT_DIR   = config["ROOT_DIR"]
+    split_path = data_file.split('/')
+    dname      = [x for x in split_path if x.startswith('silva_')][0]
 
+    config["LABEL"] = args.label
+    config["TAXA"]  = dname
+
+    update_config(config_file=cfg_path, config_dict=config)
+
+    model_dir = Path(ROOT_DIR, 'results', 'models', label, '16s_transformer', dname)
+
+    os.makedirs(model_dir, exist_ok=True)
+    
     out_dir = Path(batch_dir, "trained_models")
     out_dir.mkdir(exist_ok=True)
     torch.save(model.state_dict(), out_dir / f"{args.label}_transformer.pth")

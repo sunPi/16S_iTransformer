@@ -10,10 +10,10 @@ from utils import *
 # 1. Load SILVA FASTA with taxonomy
 # ========================
 def load_silva_fasta(fasta_path, n_max=None):
-    records = []
+    records = [] # Creates and empty list to store sequence records
     handle = gzip.open(fasta_path, "rt") if fasta_path.endswith(".gz") else open(fasta_path, "r")
 
-    for i, rec in enumerate(SeqIO.parse(handle, "fasta")):
+    for i, rec in enumerate(SeqIO.parse(handle, "fasta")): # Loop over records in a fasta file and split data
         parts = rec.description.split(" ", 1)
         accession = parts[0]
         taxonomy = parts[1].split(";") if len(parts) > 1 else ["Unclassified"]
@@ -63,14 +63,25 @@ def build_feature_columns(max_len, alphabet=("A","C","G","T","N")):
 # ========================
 # 3. Build per-taxa DFs
 # ========================
-def build_single_label_dfs(df, max_len, out_prefix="silva"):
+def build_single_label_dfs(df, max_len, out_prefix="silva", levels=None):
     taxa_levels = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
+
+    # If no specific levels requested, process all
+    if levels is None:
+        levels = taxa_levels
+    else:
+        # Ensure it's a list even if user passes a single string
+        if isinstance(levels, str):
+            levels = [levels]
+        # Validate
+        levels = [lvl for lvl in levels if lvl in taxa_levels]
+
     dfs = {}
-    X = encode_dataframe(df, max_len=max_len)           # 3D array
-    X_flat = X.reshape(X.shape[0], -1)                 # flatten to 2D [samples, max_len*5]
+    X = encode_dataframe(df, max_len=max_len)
+    X_flat = X.reshape(X.shape[0], -1)
     feature_cols = build_feature_columns(max_len=max_len)
 
-    for level in taxa_levels:
+    for level in levels:
         df_sub = pd.DataFrame({
             "SampleID": df["SampleID"],
             "Y": df[level]
@@ -80,16 +91,14 @@ def build_single_label_dfs(df, max_len, out_prefix="silva"):
 
         dfs[level] = df_full
 
-        # Save Pickle
         os.makedirs(os.path.dirname(f"{out_prefix}_{level}.pkl"), exist_ok=True)
         df_full.to_pickle(f"{out_prefix}_{level}.pkl")
-
-        # Save CSV
         df_full.to_csv(f"{out_prefix}_{level}.csv", index=False)
 
         print(f"Saved {out_prefix}_{level}.pkl and .csv with {len(df_full)} rows")
 
     return dfs
+
 
 # ========================
 # 4. Build multi-label DF
@@ -122,23 +131,24 @@ if __name__ == "__main__":
     parser.add_argument('-f', '--fasta', type=str, required=True, help='File path for input data in fasta format.')
     parser.add_argument('-n', '--n_max', type=int, required=True, default=None, help='Maximum number of sequences to process.')
     parser.add_argument('-l', '--max_length', type=int, required=True, default=1600, help='Maximum length of sequences to process.')
+    parser.add_argument('-c', '--levels', type=str, required=True, default=1600, help='Maximum length of sequences to process.')
     
     # Parse arguments
     args = parser.parse_args()
     
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config = load_cfg(os.path.dirname(script_dir) + "/config.cfg")
-
     ROOT_DIR = config["ROOT_DIR"]
     print(ROOT_DIR)
-
     # ROOT_DIR = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/"
     fasta_file = ROOT_DIR + "/" +  args.fasta
     # fasta_file = ROOT_DIR + "data/16S_RNA/SILVA_138.2_SSURef_NR99_tax_silva.fasta"
     
-    n_max = args.n_max
+    n_max   = args.n_max
     max_len = args.max_length
-    
+    levels  = args.levels
+    if levels == "None":
+        levels = None
     # n_max = None  # set to None to load all
     # max_len = 1600
     
@@ -150,7 +160,7 @@ if __name__ == "__main__":
     # per-level
     out_prefix = ROOT_DIR + "/data/16S_RNA/singlelabel/silva"
     os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
-    single_label_dfs = build_single_label_dfs(df, out_prefix=out_prefix, max_len=max_len)
+    single_label_dfs = build_single_label_dfs(df, out_prefix=out_prefix, max_len=max_len, levels=levels)
 
     # multi-label
     out_prefix = ROOT_DIR + "/data/16S_RNA/multilabel/silva_multilabel"

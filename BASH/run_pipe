@@ -16,7 +16,7 @@ usage()
    echo "                                  -l       Maximum length of sequences to process. "
    echo "                                  -t       Specify which training algorithm to use. [Options: 'itransformer', 'xgb', 'graph']"
    echo "                                  -i       Specify if incremental learning is using class native or expansion. [Options: 'native', 'expansion']"
-   echo "                                  -b       Specify the batch size for training. [Default: 32]"
+   echo "                                  -b       Specify the batch size for training. [Default: None]"
    echo "                                  -c       Specify to train on a specific taxonomy. [Options: 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']"
    echo "                                  -V       Prints out the tool version.            "
    echo "                                  -h       Print this Help.                        "
@@ -106,7 +106,17 @@ fi
 
 if [ -z "${BATCH_SIZE:-}" ]; then
     BATCH_SIZE="None"
+    BATCH="False"
+    sldata_path="$ROOT_DIR/data/16S_RNA/singlelabel"
+
     echo "No batch size provided. Using default: $BATCH_SIZE"
+else
+    if [ "$TRAINING_ALGO" = "xgb" ]; then
+        echo "XGBoost does not support batch training. Exiting pipeline..."
+        exit 1
+    fi
+    sldata_path="$ROOT_DIR/data/16S_RNA/singlelabel/batches"
+    BATCH="True"
 fi
 
 if [ -z "${TAXONOMY:-}" ]; then
@@ -139,7 +149,7 @@ fi
 
 echo "Processing FASTA file..."
 
-python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH -c $TAXONOMY
+python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH -c $TAXONOMY -b $BATCH_SIZE
 
 # # ========================================
 # # 2. Split files into train/test fractions
@@ -147,32 +157,35 @@ python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH -c $TAXONOMY
 # # Split single label data
 echo "Splitting single label data..."
 
-sldata_path="$ROOT_DIR/data/16S_RNA/singlelabel"
-
-for file in "$sldata_path"/*; do
-    if [ -f "$file" ]; then
-        echo "Processing $file..."
-        python3 "$split" -f "$file" -b "$BATCH_SIZE"
-        echo "Done!"
-    fi
-done
+if [ "${BATCH:-}" = "False" ]; then
+    for file in "$sldata_path"/*.pkl; do
+        if [ -f "$file" ]; then
+            echo "Processing $file..."
+            python3 "$split" -f "$file" -b "$BATCH"
+            echo "Done!"
+        fi
+    done
+else
+    echo "Processing batches in $sldata_path..."
+    python3 "$split" -f "$sldata_path" -b "$BATCH"
+    echo "Done!"
+fi
 
 # ========================================
-# 3. Train using training DFs
+# 3. Train using training DFs or batches
 # ========================================
 # Train single-label models
 echo "Training single-label models..."
 
-sldata_path="$ROOT_DIR/data/16S_RNA/singlelabel"
 
-
-    for dir in "$sldata_path"/*; do
+if [ "${BATCH:-}" = "False" ]; then
+   for dir in "$sldata_path"/*; do
       if [ -d "$dir" ]; then
         for file in "$dir"/train/*.pkl; do
           if [ -f "$file" ]; then
             echo "Training on $file.."
 
-            python3 "$train" -t "$file" -l "single" --val "$dir"/test/*.pkl
+            python3 "$train" -t "$file"
             MODEL_DIR=$(python3 "$gen_model_dir")
             python3 "$evaluate" -m "$MODEL_DIR"  
 
@@ -180,6 +193,15 @@ sldata_path="$ROOT_DIR/data/16S_RNA/singlelabel"
         done
       fi
     done
+else
+    echo "Training on batches in $sldata_path..."
+
+    python3 "$train" -t "$sldata_path/" --batch_size "$BATCH_SIZE"
+    MODEL_DIR=$(python3 "$gen_model_dir")
+    python3 "$evaluate" -m "$MODEL_DIR"  
+fi
+
+    
 
 # ========================================
 # 4. (Optional) Class Expansion Incremental Learning

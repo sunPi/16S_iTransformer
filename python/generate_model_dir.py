@@ -8,17 +8,14 @@ Created on Tue Sep 23 13:52:18 2025
 
 from pathlib import Path
 from utils import *
-import os
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-cfg_path   = os.path.dirname(script_dir) + "/config.cfg"
-config = load_cfg(cfg_path)
+config = load_cfg()
 
 ROOT_DIR = config["ROOT_DIR"]
-label    = config["LABEL"]
-dname    = config["TAXA"]
+LABEL    = config["LABEL"]
+FNAME    = config["FNAME"]
 
-model_dir = Path(ROOT_DIR, 'results', 'models', label, '16s_transformer', dname)
+model_dir = Path(ROOT_DIR, 'results', 'models', LABEL, '16s_transformer', FNAME)
 
 # Print the path to stdout
 print(model_dir.as_posix())

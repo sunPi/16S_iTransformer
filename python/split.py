@@ -12,7 +12,14 @@ from sklearn.model_selection import train_test_split
 import argparse
 from pathlib import Path
 from collections import Counter
-import math
+from collections import defaultdict
+import pickle
+from utils import *
+import re
+import ast
+import random
+import math 
+import shutil
 
 # ========================
 # 1. Functions
@@ -88,33 +95,6 @@ def data_split(df):
     train_df, test_df = train_test_split(df, test_size=0.2, stratify=y, random_state=42, shuffle=True)
     
     return train_df, test_df
-def save_batches(df, batch_size=100, out_prefix="batch", outfolder="batches"):
-    """
-    Split a DataFrame into batches and save each as a .pkl file.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        The full dataset to split.
-    batch_size : int
-        Number of rows per batch.
-    out_prefix : str
-        Filename prefix for saved files.
-    outfolder : str
-        Directory where pickle files will be stored.
-    """
-    n_batches = math.ceil(len(df) / batch_size)
-
-    for i in range(n_batches):
-        start = i * batch_size
-        end = start + batch_size
-        batch_df = df.iloc[start:end]
-        out_path = os.path.join(outfolder, f"{out_prefix}_batch_{i+1}.pkl")
-        batch_df.to_pickle(out_path)
-        
-       #print(f"✅ Saved {out_path} ({len(batch_df)} rows)")
-
-    print(f"\nTotal: {n_batches} batches saved.")
 
 # ========================
 # 2. Main
@@ -123,72 +103,136 @@ if __name__ == "__main__":
     # Set up argument parser
     parser = argparse.ArgumentParser(description="16S RNA Transformer - Split")
     parser.add_argument('-f', '--file', type=str, required=True, help='File path for the processed fasta files in either .csv or .pkl.')
-    parser.add_argument('-b', '--batch_size', required=False, help='If set, processes the train data into batches of determined size', default=None)
+    parser.add_argument('-b', '--batch', type=str, required=False, help='If set, processes the train data into batches of determined size', default=False)
 
     # Parse arguments
     args = parser.parse_args()
         
     # Input and output file paths
-    #input_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/silva_species.pkl"
-    #batch_size = 100
+    # input_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/silva_species.pkl"
+    # script_dir = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/python"
+    # batch      = True
+    
     input_file = args.file
-     
-    if args.batch_size == "None":
-        batch_size = None
+    batch      = args.batch
+    config     = load_cfg()
+    
+    if batch == "True":
+        batch = True
     else:
-        batch_size = args.batch_size
+        batch = False
+    
+    ROOT_DIR = config["ROOT_DIR"]
+    taxa_levels = ast.literal_eval(config["LEVELS"])
         
-    # Get filename of the input file
-    fname = os.path.splitext(os.path.basename(input_file))[0]
-    
-    # Create names of the output folders
-    output_folder_train = Path(os.path.dirname(input_file), fname, "train")
-    output_folder_test = Path(os.path.dirname(input_file), fname, "test")
-    
-    # Create output folders
-    os.makedirs(output_folder_train, exist_ok=True)
-    os.makedirs(output_folder_test, exist_ok=True)
-    
-    # Create output file names
-    output_file_train = Path(output_folder_train, ("train_" + os.path.basename(input_file)))
-    output_file_test  = Path(output_folder_test, ("test_" + os.path.basename(input_file)))
-    
-    # Detect input file type
-    file_ext = os.path.splitext(input_file)[1].lower()
-    
-    # Read based on the input file type
-    if file_ext == ".csv":
-        df = pd.read_csv(input_file)
-    elif file_ext == ".pkl":
-        df = pd.read_pickle(input_file)
-    else:
-        raise ValueError("Unsupported file format. Use .csv or .pkl")
-    
-    # Split the data into 80% Training data and 20% Testing data
-    train_df, test_df = data_split(df)
-    
-    # Detect output file type
-    out_ext = os.path.splitext(input_file)[1].lower()
-    
-    # Save either train/test datasets or save train to batches and test normally
-    if batch_size is not None:
-        output_folder_train = Path(os.path.dirname(input_file), fname, "train")
-        save_batches(train_df, int(batch_size), "train", output_folder_train)
-        test_df.to_pickle(output_file_test)
-        
-        print("✅ Train-Test split finished")
-        print(f"Test data saved to {output_file_test}")
-        
-    else:
-        if out_ext == ".csv":
-            train_df.to_csv(output_file_train, index=False)
-            test_df.to_csv(output_file_test, index=False)
-        elif out_ext == ".pkl":
-            train_df.to_pickle(output_file_train)
-            test_df.to_pickle(output_file_test)
-        else:
-            raise ValueError("Unsupported output format. Use .csv or .pkl")
+    if batch:
+        # input_file = Path("/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/batches/")
+        def split_batches(input_file):
+            # Collect all batch files
+            batch_files = sorted(Path(input_file).glob("*.pkl"))
+                  
+            # Dictionary to hold grouped batch files by taxonomy level        
+            batch_groups = defaultdict(list)
             
-        print("✅ Train-Test split inished")
-        print(f"Training data saved to {output_file_train}")
-        print(f"Test data saved to {output_file_test}")
+            for file_path in batch_files:
+                fname = os.path.basename(file_path)
+                match = re.search(r"batch_\d+_([a-zA-Z]+)\.pkl", fname)
+                if match:
+                    level = match.group(1)
+                    batch_groups[level].append(file_path)
+    
+            for level in taxa_levels:
+                nbatch = len(batch_groups[level]) # Get amount of batches
+                random.shuffle(batch_groups[level]) # Shuffle them
+                training_partition = math.ceil(nbatch * 0.8)
+                testing_partition  = nbatch - training_partition
+    
+                train_data = batch_groups[level][0:training_partition]
+                test_data  = batch_groups[level][-testing_partition:]
+                
+                config["FNAME"] = f'silva_{level}'
+                update_config(config)
+                
+                output_folder_train = Path(os.path.dirname(input_file), 'batches', f'silva_{level}', "train")
+                output_folder_test  = Path(os.path.dirname(input_file), 'batches', f'silva_{level}', "test")
+                
+                output_folder_train.mkdir(parents=True, exist_ok=True)
+                output_folder_test.mkdir(parents=True, exist_ok=True)
+    
+                # Move files
+                for f in train_data:
+                    try:
+                        shutil.move(f, output_folder_train / Path(f).name)
+                    except Exception as e:
+                        print(f"❌ Failed to move {f} → {output_folder_train}: {e}")
+                
+                tdfs = []
+                for f in test_data:
+                    try:
+                        # Load and merge all test batch files
+                        tdf = pd.read_pickle(f)
+                        tdfs.append(tdf)       
+                        f.unlink() 
+                    except Exception as e:
+                        print(f"❌ Failed to merge test batches into a dataframe!")
+                        
+                # Combine into one DataFrame
+                test_df = pd.concat(tdfs, ignore_index=True)
+
+                # Save merged test set
+                test_df.to_pickle(output_folder_test / f'test_silva_{level}.pkl')
+                
+                print(f"Merged test set saved as {output_folder_test / f'test_silva_{level}.pkl'}")
+                print("✅ Train-Test split finished")
+                
+        split_batches(input_file)
+    else:
+        def split_dataframe(input_file):
+            fname = os.path.splitext(os.path.basename(input_file))[0]
+            config["FNAME"] = fname
+            update_config(config)
+            
+            output_folder_train = Path(os.path.dirname(input_file), fname, "train")
+            output_folder_test = Path(os.path.dirname(input_file), fname, "test")
+            
+            os.makedirs(output_folder_train, exist_ok=True)
+            os.makedirs(output_folder_test, exist_ok=True)
+            
+            output_file_train = Path(output_folder_train, ("train_" + os.path.basename(input_file)))
+            output_file_test  = Path(output_folder_test, ("test_" + os.path.basename(input_file)))
+            
+            # Detect input file type
+            file_ext = os.path.splitext(input_file)[1].lower()
+            
+            if file_ext == ".csv":
+                df = pd.read_csv(input_file)
+            elif file_ext == ".pkl":
+                df = pd.read_pickle(input_file)
+            else:
+                raise ValueError("Unsupported file format. Use .csv or .pkl")
+            
+            # Extract labels
+            y = df["Y"]
+    
+            # Split into train (80%) and test (20%)
+            train_df, test_df = train_test_split(df, test_size=0.2, stratify=y, random_state=42, shuffle=True)
+            
+            # Detect output file type
+            out_ext = os.path.splitext(input_file)[1].lower()
+            
+            if out_ext == ".csv":
+                train_df.to_csv(output_file_train, index=False)
+                test_df.to_csv(output_file_test, index=False)
+            elif out_ext == ".pkl":
+                train_df.to_pickle(output_file_train)
+                test_df.to_pickle(output_file_test)
+            else:
+                raise ValueError("Unsupported output format. Use .csv or .pkl")
+            
+            print("✅ Train-Test split Finished")
+            print(f"Training data saved to {output_file_train}")
+            print(f"Test data saved to {output_file_test}")
+        
+        split_dataframe(input_file)
+        
+        

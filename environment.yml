@@ -1,0 +1,16 @@
+name: notebook
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - numpy
+  - pandas
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - biopython
+  - pip
+  - pip:
+      - torch==2.8.0      # CPU-only torch from PyPI
+      - torchvision==0.23.0

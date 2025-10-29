@@ -193,7 +193,7 @@ def build_multilabel_df(df, max_len, out_file_prefix="silva_multilabel"):
     df_full.to_csv(f"{out_file_prefix}.csv", index=False)
 
     print(f"Saved {out_file_prefix}.pkl and .csv with {len(df_full)} rows")
-    return df_full
+    # return df_full
 
 # Write out dataframes
 def write_df(df, out_prefix):
@@ -305,32 +305,7 @@ if __name__ == "__main__":
             out_prefix = ROOT_DIR + "/data/16S_RNA/multilabel/silva_multilabel"
             os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
             
-            multilabel_df = build_multilabel_df(df, max_len=max_len, out_file_prefix=out_prefix)
+            build_multilabel_df(df, max_len=max_len, out_file_prefix=out_prefix)
         process_df(df, max_len, levels, ROOT_DIR)
         
     print("✅ Data processing finished")
- 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
-    
->>>>>>> batch_feature

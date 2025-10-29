@@ -1,12 +1,15 @@
 from pathlib import Path
+import os
 
-def load_cfg(filepath):
+def load_cfg():
     """
     Reads a text file with KEY=VALUE pairs and returns a dict.
     Ignores empty lines and comments starting with #.
     """
-
-    env_vars = {}
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    filepath  = os.path.dirname(script_dir) + "/config.cfg"
+    
+    cfg = {}
     with open(filepath, "r") as f:
         for line in f:
             line = line.strip()
@@ -15,10 +18,11 @@ def load_cfg(filepath):
                 continue
             if "=" in line:
                 key, value = line.split("=", 1)  # split only on first '='
-                env_vars[key.strip()] = value.strip()
-    return env_vars
+                cfg[key.strip()] = value.strip()
+    
+    return cfg
 
-def update_config(config_file: str, config_dict: dict):
+def update_config(config_dict: dict):
     """
     Write a dictionary to a config file in KEY=VALUE format.
 
@@ -26,7 +30,9 @@ def update_config(config_file: str, config_dict: dict):
         config_file (str): Path to the config file.
         config_dict (dict): Dictionary of variables to write.
     """
-    config_file = Path(config_file)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_file = Path(os.path.dirname(script_dir), "config.cfg")
+
     with open(config_file, "w") as f:
         for key, value in config_dict.items():
             f.write(f"{key}={value}\n")

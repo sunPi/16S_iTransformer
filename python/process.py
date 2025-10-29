@@ -5,10 +5,13 @@ import os
 from Bio import SeqIO
 import argparse
 from utils import *
+from pathlib import Path
+from collections import Counter
 
 # ========================
-# 1. Load SILVA FASTA with taxonomy
+# 1. Functions
 # ========================
+# Loader Function
 def load_silva_fasta(fasta_path, n_max=None):
     records = [] # Creates and empty list to store sequence records
     handle = gzip.open(fasta_path, "rt") if fasta_path.endswith(".gz") else open(fasta_path, "r")
@@ -40,9 +43,7 @@ def load_silva_fasta(fasta_path, n_max=None):
     handle.close()
     return pd.DataFrame(records)
 
-# ========================
-# 2. One-hot encode sequences
-# ========================
+# Sequence processing functions
 def one_hot_encode(seq, max_len):
     mapping = {"A":0, "C":1, "G":2, "T":3, "N":4}
     arr = np.zeros((max_len, len(mapping)), dtype=np.float32)
@@ -63,6 +64,79 @@ def build_feature_columns(max_len, alphabet=("A","C","G","T","N")):
 # ========================
 # 3. Build per-taxa DFs
 # ========================
+def process_records(df, max_len, levels):
+    X = encode_dataframe(df, max_len=max_len)
+    X_flat = X.reshape(X.shape[0], -1)
+    feature_cols = build_feature_columns(max_len=max_len)
+
+    for level in levels:
+        df_sub = pd.DataFrame({
+            "SampleID": df["SampleID"].values,
+            "Y": df[level].values
+        }).reset_index(drop=True)
+
+        df_features = pd.DataFrame(X_flat, columns=feature_cols).reset_index(drop=True)
+
+        df_full = pd.concat([df_sub, df_features], axis=1)
+        
+        # sanity check
+        if df_full.isna().any().any():
+            print(f"⚠️ NaNs introduced at level {level} — likely index mismatch or malformed input")
+
+        yield df_full, level
+
+def iter_batches(df, batch_size=5000):
+    for i in range(0, len(df), batch_size):
+        yield df.iloc[i:i+batch_size]
+        
+def handle_rare_clases(df):  
+    print("Handling rare cases...")
+    
+    # Extract labels
+    y = df["Y"]
+    
+    # Assuming your labels are in df['Y']
+    counts = y.value_counts()
+    
+    # Count how many classes have fewer than 2 samples
+    num_rare_classes = (counts < 2).sum()
+    if num_rare_classes > 0:
+        # Option 1: Remove classes with only 1 element per class
+        counts = Counter(y)
+        df = df[df['Y'].map(counts) >= 2]
+        y = df['Y']
+        
+    else:
+        # Option 2: Group them into 'Other'
+        # Step 1: Group rare classes into 'Other'
+        threshold = 2
+        counts = y.value_counts()
+        rare_classes = counts[counts < threshold].index
+        df['label'] = df['Y'].replace(rare_classes, 'Other')
+        y = df['label']
+        
+        # Step 2: Drop any classes (including 'Other') with < 2 samples
+        try:
+            counts = y.value_counts()
+            valid_classes = counts[counts >= 2].index
+            before = len(df)
+            df = df[df['label'].isin(valid_classes)]
+            y = df['label']
+            after = len(df)
+        
+            if after < before:
+                print(f"Dropped {before - after} rows from singleton classes.")
+            if df.empty:
+                raise ValueError("All rows were dropped after filtering singleton classes.")
+        except Exception as e:
+            print(f"⚠️ Warning while filtering singleton classes: {e}")
+            print("Proceeding without filtering.")
+            y = df['label']
+    
+    return df
+
+# Dataframe builders
+# Single-label DF
 def build_single_label_dfs(df, max_len, out_prefix="silva", levels=None):
     taxa_levels = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
 
@@ -99,10 +173,10 @@ def build_single_label_dfs(df, max_len, out_prefix="silva", levels=None):
 
     return dfs
 
-
 # ========================
 # 4. Build multi-label DF
 # ========================
+# Multi-label DF
 def build_multilabel_df(df, max_len, out_file_prefix="silva_multilabel"):
     X = encode_dataframe(df, max_len=max_len)
     X_flat = X.reshape(X.shape[0], -1)
@@ -121,50 +195,142 @@ def build_multilabel_df(df, max_len, out_file_prefix="silva_multilabel"):
     print(f"Saved {out_file_prefix}.pkl and .csv with {len(df_full)} rows")
     return df_full
 
+# Write out dataframes
+def write_df(df, out_prefix):
+    #os.makedirs(os.path.dirname(), exist_ok=True)
+    df.to_pickle(f"{out_prefix}.pkl")
+    df.to_csv(f"{out_prefix}.csv", index=False) 
 
 # ========================
-# 5. Main
+# 2. Main
 # ========================
 if __name__ == "__main__":
-    # Set up argument parser
+    ########### Set up argument parser
     parser = argparse.ArgumentParser(description="16S RNA Transformer - Process")
     parser.add_argument('-f', '--fasta', type=str, required=True, help='File path for input data in fasta format.')
     parser.add_argument('-n', '--n_max', type=int, required=True, default=None, help='Maximum number of sequences to process.')
     parser.add_argument('-l', '--max_length', type=int, required=True, default=1600, help='Maximum length of sequences to process.')
-    parser.add_argument('-c', '--levels', type=str, required=True, default=1600, help='Maximum length of sequences to process.')
+    parser.add_argument('-c', '--levels', type=str, help='Specify a subset of taxonomy to process.')
+    parser.add_argument('-b', '--batch_size', type=str, help='Specify the size of batches to process the data on.')
     
-    # Parse arguments
+    ########### Parse arguments
     args = parser.parse_args()
-    
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    config = load_cfg(os.path.dirname(script_dir) + "/config.cfg")
-    ROOT_DIR = config["ROOT_DIR"]
-    print(ROOT_DIR)
+    # script_dir = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/python"
     # ROOT_DIR = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/"
-    fasta_file = ROOT_DIR + "/" +  args.fasta
     # fasta_file = ROOT_DIR + "data/16S_RNA/SILVA_138.2_SSURef_NR99_tax_silva.fasta"
     
+    config = load_cfg()
+    ROOT_DIR = config["ROOT_DIR"]
+    config["LABEL"] = "singlelabel"
+    update_config(config)
+    
+    print(ROOT_DIR)
+    
+    fasta_file = ROOT_DIR + "/" +  args.fasta
     n_max   = args.n_max
     max_len = args.max_length
     levels  = args.levels
+    batch_size = args.batch_size
+
     if levels == "None":
         levels = None
-    # n_max = None  # set to None to load all
-    # max_len = 1600
-    
+    if batch_size == "None":
+        batch_size = None
+    else:
+        batch_size = int(batch_size)
+        
+    ########### Load In Fasta File
     print("Loading SILVA fasta...")
     df = load_silva_fasta(fasta_file, n_max=n_max)
     print(df.head())
-    print(df.shape)
+    print(df.shape)  
     
     # per-level
     out_prefix = ROOT_DIR + "/data/16S_RNA/singlelabel/silva"
     os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
-    single_label_dfs = build_single_label_dfs(df, out_prefix=out_prefix, max_len=max_len, levels=levels)
+    
+    taxa_levels = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
+    
+    ########### Ensure taxonomy levels are handled correctly
+    # If no specific levels requested, process all
+    if levels is None: # If user doest not specify to process a specific level
+        levels = taxa_levels
+        config["LEVELS"] = levels
+        update_config(config)
+        
+    else:
+        # Ensure it's a list even if user passes a single string
+        if isinstance(levels, str):
+            levels = [levels]
+            
+        # Validate
+        invalid = [lvl for lvl in levels if lvl not in taxa_levels]
+        if invalid:
+            raise ValueError(f"Inappropriate level variable(s): {invalid}. Did you misspell a taxonomy level?")
 
-    # multi-label
-    out_prefix = ROOT_DIR + "/data/16S_RNA/multilabel/silva_multilabel"
-    os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
-    multilabel_df = build_multilabel_df(df, max_len=max_len, out_file_prefix=out_prefix)
+        levels = [lvl for lvl in levels if lvl in taxa_levels] # If a user requests only one level
+        config["LEVELS"] = levels
+        update_config(config)
+    
+    ########### Process Fasta File and Build single/multi-label DF
+    if batch_size is not None: # Process in batches
+        def process_batches(df, batch_size, max_len, levels, ROOT_DIR):
+            for i, batch in enumerate(iter_batches(df, batch_size), 1):
+                for pbatch, level in process_records(batch, max_len, levels):  
+                    if pbatch.isna().any().any():
+                        raise ValueError(f"NaN found in batch {i}. Please check your data!")
+                    print(f"Processing {level} batch {i} ({len(batch)} rows)")
+                    out_prefix = Path(ROOT_DIR, f"{level}") 
+                    out_prefix = Path(ROOT_DIR, 'data', '16S_RNA', 'singlelabel', 'batches', f'batch_{i}')
+                    os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
+                    
+                    pbatch = handle_rare_clases(pbatch)
+                    pbatch.to_pickle(f"{out_prefix}_{level}.pkl")
+                    print(f"Saved {out_prefix}_{level}.pkl and .csv with {len(pbatch)} rows")
+        process_batches(df, batch_size, max_len, levels, ROOT_DIR)
+                
+    else: # Processes full dataframes
+        def process_df(df, max_len, levels, ROOT_DIR):
+            for pdf, level in process_records(df, max_len, levels):  
+                print(f"Processing {level}...")
+                out_prefix = Path(ROOT_DIR, 'data', '16S_RNA', 'singlelabel', 'silva')
+                out_prefix = f'{out_prefix}_{level}'
+                os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
+                
+                pdf = handle_rare_clases(pdf)
+                write_df(pdf, out_prefix)
+                print(f"Saved {out_prefix}_{level}.pkl and .csv with {len(pdf)} rows")
+                
+            # multi-label
+            out_prefix = ROOT_DIR + "/data/16S_RNA/multilabel/silva_multilabel"
+            os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
+            
+            multilabel_df = build_multilabel_df(df, max_len=max_len, out_file_prefix=out_prefix)
+        process_df(df, max_len, levels, ROOT_DIR)
+        
+    print("✅ Data processing finished")
+ 
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
-    print("✅ Preprocessing finished")
+    
+>>>>>>> batch_feature

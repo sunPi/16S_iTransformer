@@ -27,6 +27,7 @@ import argparse
 # Set up argument parser
 parser = argparse.ArgumentParser(description="16S RNA Transformer - Evaluate")
 parser.add_argument('-m', '--model_path', type=str, required=True, help='File path to the model directory.')
+parser.add_argument('-b', '--batch', type=str, help='Set if batch training models.')
 
 # Parse arguments
 args = parser.parse_args()
@@ -37,17 +38,14 @@ args = parser.parse_args()
 # config    = load_cfg("/home/jr453/Documents/Projects/Reem_16s_RNA_classification/Reem_Taxonomy_Challenge/config.cfg")
 model_dir = args.model_path
 
-script_dir = os.path.dirname(os.path.abspath(__file__))
-cfg_path   = os.path.dirname(script_dir) + "/config.cfg"
-config = load_cfg(cfg_path)
+config = load_cfg()
 
 ROOT_DIR = config["ROOT_DIR"]
-
-label    = config["LABEL"]
-dname    = config["TAXA"]
+LABEL    = config["LABEL"]
+FNAME    = config["FNAME"]
 
 # model_dir = Path(ROOT_DIR, 'results', 'models', 'single', '16s_transformer', label)
-file             = "test_" + dname + ".pkl"
+file             = "test_" + FNAME + ".pkl"
 
 # ========================
 # 1. Load model + encoder
@@ -78,7 +76,7 @@ with open(Path(model_dir, 'label_encoder.pkl'), "rb") as f:
 num_labels = len(le.classes_)
 
 # Load evaluation dataset (50 cut sequences, pickled/CSV format)
-eval_file = Path(ROOT_DIR, 'data', '16S_RNA', 'singlelabel', dname , 'test', file)  # replace with your held-out 50 seqs
+eval_file = Path(ROOT_DIR, 'data', '16S_RNA', LABEL, FNAME , 'test', file)  # replace with your held-out 50 seqs
 
 if eval_file.as_posix().endswith(".pkl"):
     df_eval = pickle.load(open(eval_file, "rb"))
@@ -166,7 +164,7 @@ df.to_csv(csv_file, index=False)
 plt.figure(figsize=(8, 6))
 plt.ylim(0, 1.05)
 plt.ylabel("Score")
-plt.title("Evaluation Metrics - 16S Transformer on " + label)
+plt.title("Evaluation Metrics - 16S Transformer on " + LABEL)
 sns.barplot(x=list(metrics.keys()), y=list(metrics.values()), palette="viridis")
 plt.tight_layout()
 plt.savefig(Path(model_dir, 'metrics_barplot.png'), dpi=300)

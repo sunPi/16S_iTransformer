@@ -24,6 +24,11 @@ args = parser.parse_args()
 data_file = args.trdata
 label = args.label
 
+
+data_File = ""
+label
+
+
 if data_file.endswith(".pkl"):
     df = pickle.load(open(data_file, "rb"))
 else:

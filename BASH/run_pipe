@@ -1,4 +1,5 @@
 #/bin/bash
+set -euo pipefail
 
 verbose="F"
 . ~/bioinf-tools/bin/utils
@@ -15,6 +16,8 @@ usage()
    echo "                                  -l       Maximum length of sequences to process. "
    echo "                                  -t       Specify which training algorithm to use. [Options: 'itransformer', 'xgb', 'graph']"
    echo "                                  -i       Specify if incremental learning is using class native or expansion. [Options: 'native', 'expansion']"
+   echo "                                  -b       Specify the batch size for training. [Default: None]"
+   echo "                                  -c       Specify to train on a specific taxonomy. [Options: 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']"
    echo "                                  -V       Prints out the tool version.            "
    echo "                                  -h       Print this Help.                        "
    echo "                                                                                                        "
@@ -24,7 +27,7 @@ usage()
 # Initialize variables
 # outfolder="NULL"
 
-while getopts ":hf:n:l:t:V" flag;
+while getopts ":hf:n:l:t:b:c:V" flag;
 do
     case "${flag}" in
         h) # Display Help Function
@@ -44,6 +47,12 @@ do
         ;;
         i)
               INCREMENTAL_TYPE=${OPTARG}
+        ;; 
+        b)
+              BATCH_SIZE=${OPTARG}
+        ;;
+        c)
+              TAXONOMY=${OPTARG}
         ;;
         V)
               version="version"
@@ -85,15 +94,38 @@ evaluate="$ROOT_DIR/python/evaluate.py"
 # fi
 
 # Set default values if not provided
-if [ -z "$N_MAX" ]; then
+if [ -z "${N_MAX:-}" ]; then
     N_MAX=10000
     echo "No maximum number of sequences provided. Using default: $N_MAX"
 fi
 
-if [ -z "$MAX_LENGTH" ]; then
+if [ -z "${MAX_LENGTH:-}" ]; then
     MAX_LENGTH=1600
     echo "No maximum sequence length provided. Using default: $MAX_LENGTH"
 fi
+
+if [ -z "${BATCH_SIZE:-}" ]; then
+    BATCH_SIZE="None"
+    BATCH="False"
+    sldata_path="$ROOT_DIR/data/16S_RNA/singlelabel"
+
+    echo "No batch size provided. Using default: $BATCH_SIZE"
+else
+    if [ "$TRAINING_ALGO" = "xgb" ]; then
+        echo "XGBoost does not support batch training. Exiting pipeline..."
+        exit 1
+    fi
+    sldata_path="$ROOT_DIR/data/16S_RNA/singlelabel/batches"
+    BATCH="True"
+fi
+
+if [ -z "${TAXONOMY:-}" ]; then
+    TAXONOMY="None"
+    echo "No taxonomy level provided. Using all taxonomy levels."
+else
+    echo "Training on taxonomy level: $TAXONOMY"
+fi
+
 if [ "$TRAINING_ALGO" = "itransformer" ]; then 
     echo "Using iTransformer as the training algorithm."
     train="$ROOT_DIR/python/train_transformer.py"
@@ -116,7 +148,8 @@ fi
 # ========================================
 
 echo "Processing FASTA file..."
-python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH
+
+python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH -c $TAXONOMY -b $BATCH_SIZE
 
 # # ========================================
 # # 2. Split files into train/test fractions
@@ -124,40 +157,51 @@ python3 $process -f $FASTA -n $N_MAX -l $MAX_LENGTH
 # # Split single label data
 echo "Splitting single label data..."
 
-sldata_path="$ROOT_DIR/data/16S_RNA/singlelabel"
-
-for file in "$sldata_path"/*; do
-    if [ -f "$file" ]; then
-        echo "Processing $file..."
-        python3 "$split" -f "$file"
-        echo "Done!"
-    fi
-done
+if [ "${BATCH:-}" = "False" ]; then
+    for file in "$sldata_path"/*.pkl; do
+        if [ -f "$file" ]; then
+            echo "Processing $file..."
+            python3 "$split" -f "$file" -b "$BATCH"
+            echo "Done!"
+        fi
+    done
+else
+    echo "Processing batches in $sldata_path..."
+    python3 "$split" -f "$sldata_path" -b "$BATCH"
+    echo "Done!"
+fi
 
 # ========================================
-# 3. Train using training DFs
+# 3. Train using training DFs or batches
 # ========================================
 # Train single-label models
 echo "Training single-label models..."
 
-sldata_path="$ROOT_DIR/data/16S_RNA/singlelabel"
 
-for dir in "$sldata_path"/*; do
-  if [ -d "$dir" ]; then
-    for file in "$dir"/train/*.pkl; do
-      if [ -f "$file" ]; then
-        echo "Training on $file.."
-        # Your commands here, e.g. python3 "$train" -t "$file"
-        python3 "$train" -t "$file" -l "single"
-        MODEL_DIR=$(python3 "$gen_model_dir")
+if [ "${BATCH:-}" = "False" ]; then
+   for dir in "$sldata_path"/*; do
+      if [ -d "$dir" ]; then
+        for file in "$dir"/train/*.pkl; do
+          if [ -f "$file" ]; then
+            echo "Training on $file.."
 
-        python3 "$evaluate" -m "$MODEL_DIR"
+            python3 "$train" -t "$file"
+            MODEL_DIR=$(python3 "$gen_model_dir")
+            python3 "$evaluate" -m "$MODEL_DIR"  
 
-        
+          fi
+        done
       fi
     done
-  fi
-done
+else
+    echo "Training on batches in $sldata_path..."
+
+    python3 "$train" -t "$sldata_path/" --batch_size "$BATCH_SIZE"
+    MODEL_DIR=$(python3 "$gen_model_dir")
+    python3 "$evaluate" -m "$MODEL_DIR"  
+fi
+
+    
 
 # ========================================
 # 4. (Optional) Class Expansion Incremental Learning
@@ -166,11 +210,8 @@ echo "Starting Class Expansion Incremental Learning..."
 
 ilearn="$ROOT_DIR/python/train_increment.py"
 
-if [ -z "$INCREMENTAL_TYPE" ]; then
-    INCREMENTAL_TYPE="native"
-    echo "No incremental learning type provided. Using default: $INCREMENTAL_TYPE"
-fi
-
+if [ -z "${INCREMENTAL_TYPE:-}" ]; then
+    echo "No incremental learning type provided. Skipping incremental learning step."
 elif [ "$INCREMENTAL_TYPE" = "native" ]; then 
     echo "Using class native incremental learning."
 

@@ -7,6 +7,7 @@ import argparse
 from utils import *
 from pathlib import Path
 from collections import Counter
+import ast
 
 # ========================
 # 1. Functions
@@ -89,8 +90,9 @@ def iter_batches(df, batch_size=5000):
     for i in range(0, len(df), batch_size):
         yield df.iloc[i:i+batch_size]
         
-def handle_rare_clases(df):  
-    print("Handling rare cases...")
+def handle_rare_clases(df, verbose):
+    if(verbose):
+        print("Handling rare cases...")
     
     # Extract labels
     y = df["Y"]
@@ -221,10 +223,14 @@ if __name__ == "__main__":
     
     config = load_cfg()
     ROOT_DIR = config["ROOT_DIR"]
+    VERBOSE  = ast.literal_eval((config["VERBOSE"]))
     config["LABEL"] = "singlelabel"
     update_config(config)
     
-    print(ROOT_DIR)
+    print(VERBOSE)
+    
+    if(VERBOSE):
+        print(ROOT_DIR)
     
     fasta_file = ROOT_DIR + "/" +  args.fasta
     n_max   = args.n_max
@@ -242,8 +248,10 @@ if __name__ == "__main__":
     ########### Load In Fasta File
     print("Loading SILVA fasta...")
     df = load_silva_fasta(fasta_file, n_max=n_max)
-    print(df.head())
-    print(df.shape)  
+    
+    if(VERBOSE):
+        print(df.head())
+        print(df.shape)  
     
     # per-level
     out_prefix = ROOT_DIR + "/data/16S_RNA/singlelabel/silva"
@@ -274,38 +282,43 @@ if __name__ == "__main__":
     
     ########### Process Fasta File and Build single/multi-label DF
     if batch_size is not None: # Process in batches
-        def process_batches(df, batch_size, max_len, levels, ROOT_DIR):
+        def process_batches(df, batch_size, max_len, levels, ROOT_DIR, verbose):
             for i, batch in enumerate(iter_batches(df, batch_size), 1):
                 for pbatch, level in process_records(batch, max_len, levels):  
                     if pbatch.isna().any().any():
                         raise ValueError(f"NaN found in batch {i}. Please check your data!")
-                    print(f"Processing {level} batch {i} ({len(batch)} rows)")
+                    if(verbose):
+                        print(f"Processing {level} batch {i} ({len(batch)} rows)")
+                        
                     out_prefix = Path(ROOT_DIR, f"{level}") 
                     out_prefix = Path(ROOT_DIR, 'data', '16S_RNA', 'singlelabel', 'batches', f'batch_{i}')
                     os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
                     
-                    pbatch = handle_rare_clases(pbatch)
+                    pbatch = handle_rare_clases(pbatch, VERBOSE)
                     pbatch.to_pickle(f"{out_prefix}_{level}.pkl")
-                    print(f"Saved {out_prefix}_{level}.pkl and .csv with {len(pbatch)} rows")
-        process_batches(df, batch_size, max_len, levels, ROOT_DIR)
+                    if(verbose):
+                        print(f"Saved {out_prefix}_{level}.pkl and .csv with {len(pbatch)} rows")
+        process_batches(df, batch_size, max_len, levels, ROOT_DIR, VERBOSE)
                 
     else: # Processes full dataframes
         def process_df(df, max_len, levels, ROOT_DIR):
             for pdf, level in process_records(df, max_len, levels):  
-                print(f"Processing {level}...")
+                if(VERBOSE):
+                    print(f"Processing {level}...")
                 out_prefix = Path(ROOT_DIR, 'data', '16S_RNA', 'singlelabel', 'silva')
                 out_prefix = f'{out_prefix}_{level}'
                 os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
                 
-                pdf = handle_rare_clases(pdf)
+                pdf = handle_rare_clases(pdf, VERBOSE)
                 write_df(pdf, out_prefix)
-                print(f"Saved {out_prefix}_{level}.pkl and .csv with {len(pdf)} rows")
+                if(VERBOSE):
+                    print(f"Saved {out_prefix}_{level}.pkl and .csv with {len(pdf)} rows")
                 
             # multi-label
             out_prefix = ROOT_DIR + "/data/16S_RNA/multilabel/silva_multilabel"
             os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
             
             build_multilabel_df(df, max_len=max_len, out_file_prefix=out_prefix)
-        process_df(df, max_len, levels, ROOT_DIR)
+        process_df(df, max_len, levels, ROOT_DIR, VERBOSE)
         
     print("✅ Data processing finished")

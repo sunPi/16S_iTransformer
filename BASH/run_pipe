@@ -18,6 +18,7 @@ usage()
    echo "                                  -i       Specify if incremental learning is using class native or expansion. [Options: 'native', 'expansion']"
    echo "                                  -b       Specify the batch size for training. [Default: None]"
    echo "                                  -c       Specify to train on a specific taxonomy. [Options: 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']"
+   echo "                                  -v       Prints out messages verbously.          "
    echo "                                  -V       Prints out the tool version.            "
    echo "                                  -h       Print this Help.                        "
    echo "                                                                                                        "
@@ -27,7 +28,7 @@ usage()
 # Initialize variables
 # outfolder="NULL"
 
-while getopts ":hf:n:l:t:b:c:V" flag;
+while getopts ":hf:n:l:t:b:c:vV" flag;
 do
     case "${flag}" in
         h) # Display Help Function
@@ -54,6 +55,9 @@ do
         c)
               TAXONOMY=${OPTARG}
         ;;
+        v)
+              VERBOSE="True"
+        ;;
         V)
               version="version"
         echo $version
@@ -73,10 +77,15 @@ done
 # Get ROOT DIR
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+if [ -z "${VERBOSE:-}" ]; then
+    VERBOSE="False"
+fi
+
 # Create a config file
 # Write them into a plain text config
 cat <<EOF > "$ROOT_DIR/config.cfg"
 ROOT_DIR=$ROOT_DIR
+VERBOSE=$VERBOSE
 EOF
 
 # Define paths to scripts
@@ -86,7 +95,10 @@ gen_model_dir="$ROOT_DIR/python/generate_model_dir.py"
 evaluate="$ROOT_DIR/python/evaluate.py"
 
 # # Download SILVA 138.2 SSURef NR99 fasta file if not already present
-# wget -P $ROOT_DIR/data/16S_RNA/ https://www.arb-silva.de/fileadmin/silva_databases/current/Exports/SILVA_138.2_SSURef_NR99_tax_silva.fasta.gz
+
+# if [ ! -f "$ROOT_DIR/data/16S_RNA/SILVA_138.2_SSURef_NR99_tax_silva.fasta.gz" ]; then
+#     wget -P $ROOT_DIR/data/16S_RNA/ https://www.arb-silva.de/fileadmin/silva_databases/current/Exports/SILVA_138.2_SSURef_NR99_tax_silva.fasta.gz
+# fi
 
 # # Unzip the file if not already unzipped
 # if [ ! -f "$ROOT_DIR/data/16S_RNA/SILVA_138.2_SSURef_NR99_tax_silva.fasta" ]; then
@@ -94,6 +106,7 @@ evaluate="$ROOT_DIR/python/evaluate.py"
 # fi
 
 # Set default values if not provided
+
 if [ -z "${N_MAX:-}" ]; then
     N_MAX=10000
     echo "No maximum number of sequences provided. Using default: $N_MAX"

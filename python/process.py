@@ -227,8 +227,6 @@ if __name__ == "__main__":
     config["LABEL"] = "singlelabel"
     update_config(config)
     
-    print(VERBOSE)
-    
     if(VERBOSE):
         print(ROOT_DIR)
     

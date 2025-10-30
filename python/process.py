@@ -13,7 +13,33 @@ import ast
 # 1. Functions
 # ========================
 # Loader Function
+
+        
 def load_silva_fasta(fasta_path, n_max=None):
+    def inspect_fasta(fasta_path):
+        # Read sequences
+        records = list(SeqIO.parse(fasta_file, "fasta"))
+        
+        # Count total entries
+        n_entries = len(records)
+        
+        # Get all sequence lengths
+        lengths = [len(rec.seq) for rec in records]
+        
+        # Print summary
+        print(f"Total FASTA entries: {n_entries}")
+        print(f"Sequence lengths (first 10): {lengths[:10]}")
+        
+        # Check if all are equal
+        if len(set(lengths)) == 1:
+            print(f"✅ All sequences have equal length: {lengths[0]}")
+        else:
+            print("⚠️ Sequences have different lengths!")
+            #print(f"Unique lengths: {set(lengths)}")
+        
+        return n_entries
+    
+    #inspect_fasta(fasta_path)
     records = [] # Creates and empty list to store sequence records
     handle = gzip.open(fasta_path, "rt") if fasta_path.endswith(".gz") else open(fasta_path, "r")
 

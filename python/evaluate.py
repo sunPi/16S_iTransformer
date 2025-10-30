@@ -37,6 +37,7 @@ args = parser.parse_args()
 # label       = "silva_class"
 # config    = load_cfg("/home/jr453/Documents/Projects/Reem_16s_RNA_classification/Reem_Taxonomy_Challenge/config.cfg")
 model_dir = args.model_path
+batch     = args.batch
 
 config = load_cfg()
 
@@ -76,7 +77,10 @@ with open(Path(model_dir, 'label_encoder.pkl'), "rb") as f:
 num_labels = len(le.classes_)
 
 # Load evaluation dataset (50 cut sequences, pickled/CSV format)
-eval_file = Path(ROOT_DIR, 'data', '16S_RNA', LABEL, FNAME , 'test', file)  # replace with your held-out 50 seqs
+if batch:
+    eval_file = Path(ROOT_DIR, 'data', '16S_RNA', LABEL, 'batches', FNAME , 'test', file)  # replace with your held-out 50 seqs
+else:
+    eval_file = Path(ROOT_DIR, 'data', '16S_RNA', LABEL, FNAME , 'test', file)  # replace with your held-out 50 seqs
 
 if eval_file.as_posix().endswith(".pkl"):
     df_eval = pickle.load(open(eval_file, "rb"))

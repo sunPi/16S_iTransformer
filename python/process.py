@@ -325,7 +325,7 @@ if __name__ == "__main__":
         process_batches(df, batch_size, max_len, levels, ROOT_DIR, VERBOSE)
                 
     else: # Processes full dataframes
-        def process_df(df, max_len, levels, ROOT_DIR):
+        def process_df(df, max_len, levels, ROOT_DIR, VERBOSE):
             for pdf, level in process_records(df, max_len, levels):  
                 if(VERBOSE):
                     print(f"Processing {level}...")

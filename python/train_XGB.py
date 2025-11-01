@@ -21,28 +21,32 @@ from eval_utils import *
 # ==============
 parser = argparse.ArgumentParser(description="16S RNA - Train with XGBoost")
 parser.add_argument('-t', '--trdata', type=str, required=True, help='Training data file (.csv or .pkl)')
-parser.add_argument('-l', '--label', type=str, required=True, help='single or multi')
-parser.add_argument('-e', '--eval_file', type=str, required=True, help='single or multi')
 parser.add_argument('--epochs', type=int, default=100, help='Number of boosting rounds')
 parser.add_argument('--lr', type=float, default=0.1, help='Learning rate')
 parser.add_argument('--depth', type=int, default=6, help='Max tree depth')
 args = parser.parse_args()
 
 data_file = args.trdata
-label     = args.label
-eval_file = args.eval_file
 epochs = args.epochs
 lr     = args.lr
 depth  = args.depth
 
 
-data_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/silva_species/train/train_silva_species.pkl"
-eval_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/silva_species/test/test_silva_species.pkl"
-script_dir = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/python"
-label = "single"
-epochs = 100
-lr = 0.1
-depth = 6
+# data_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/silva_species/train/train_silva_species.pkl"
+# eval_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/silva_species/test/test_silva_species.pkl"
+# script_dir = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/python"
+# label = "single"
+# epochs = 100
+# lr = 0.1
+# depth = 6
+
+config     = load_cfg()
+ROOT_DIR   = config["ROOT_DIR"]
+FNAME      = config["FNAME"]
+LABEL      = config["LABEL"]
+
+file             = "test_" + FNAME + ".pkl"
+eval_file = Path(ROOT_DIR, 'data', '16S_RNA', LABEL, FNAME , 'test', file)
 
 # ==============
 # 2. Load data
@@ -103,11 +107,6 @@ else:
 # ==============
 # 4. Save model
 # ==============
-config     = load_cfg()
-ROOT_DIR   = config["ROOT_DIR"]
-FNAME      = config["FNAME"]
-LABEL      = config["LABEL"]
-
 # config["LABEL"] = args.label
 # config["TAXA"]  = dname
 # update_config(config_file=cfg_path, config_dict=config)

@@ -24,21 +24,32 @@ parser.add_argument('-t', '--trdata', type=str, required=True, help='Training da
 parser.add_argument('--epochs', type=int, default=100, help='Number of boosting rounds')
 parser.add_argument('--lr', type=float, default=0.1, help='Learning rate')
 parser.add_argument('--depth', type=int, default=6, help='Max tree depth')
+parser.add_argument('--batch', type=str, default='False', help='Max tree depth')
+
 args = parser.parse_args()
 
 data_file = args.trdata
-epochs = args.epochs
-lr     = args.lr
-depth  = args.depth
+epochs    = args.epochs
+lr        = args.lr
+depth     = args.depth
+batch     = args.batch
 
-
+if batch == 'True':
+    batch = True
+else:
+    batch = False
+    
 # data_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/silva_species/train/train_silva_species.pkl"
 # eval_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/silva_species/test/test_silva_species.pkl"
-# script_dir = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/python"
-# label = "single"
-# epochs = 100
-# lr = 0.1
-# depth = 6
+
+data_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/batches/silva_species/train"
+eval_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/silva_species/test/test_silva_species.pkl"
+
+script_dir = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/python"
+label = "single"
+epochs = 100
+lr = 0.1
+depth = 6
 
 config     = load_cfg()
 ROOT_DIR   = config["ROOT_DIR"]
@@ -67,42 +78,60 @@ def prepare_xgb_input(df, le):
     
     return X, y_enc, num_labels
 
-
-
 le = LabelEncoder()
 X, y_enc, num_labels = prepare_xgb_input(df, le)
 
 # ==============
 # 3. Train model
 # ==============
-model = XGBClassifier(
-    objective="multi:softmax",
-    num_class=num_labels,
-    n_estimators=epochs,
-    learning_rate=lr,
-    max_depth=depth,
-    tree_method="hist",
-    eval_metric="mlogloss",
-    verbosity=1
-)
+if batch:
+    # Initialize XGBoost classifier
+    num_estimators_per_batch = 10
+    model = XGBClassifier(n_estimators=num_estimators_per_batch, random_state=42)
+    model.fit(X_train, y_train)
 
-if eval_file is not None:
-    if data_file.endswith(".pkl"):
-        df_eval = pickle.load(open(data_file, "rb"))
-    else:
-        df_eval = pd.read_csv(data_file)
-        
-    X_eval, y_eval_enc, num_labels = prepare_xgb_input(df_eval, le)
+    # Train model in batches of rounds
+    for i in range(num_batches):
+        model.fit(X_train, y_train, xgb_model=model.get_booster())
     
-    # Fit with eval_set (X_val, y_val optional)
-    model.fit(
-        X, y_enc,
-        eval_set=[(X_eval, y_eval_enc)],  # or [(X_train, y_train), (X_val, y_val)]
-        verbose=True
+        # Make predictions on train and test data
+        y_train_pred = model.predict(X_train)
+        y_test_pred = model.predict(X_test)
+    
+        # Calculate and print accuracy scores
+        train_accuracy = accuracy_score(y_train, y_train_pred)
+        test_accuracy = accuracy_score(y_test, y_test_pred)
+        print(f"Batch {i+1}/{num_batches} - Train Accuracy: {train_accuracy:.4f}, Test Accuracy: {test_accuracy:.4f}")
+
+else:
+    model = XGBClassifier(
+        objective="multi:softmax",
+        num_class=num_labels,
+        n_estimators=epochs,
+        learning_rate=lr,
+        max_depth=depth,
+        tree_method="hist",
+        eval_metric="mlogloss",
+        verbosity=1
     )
     
-else:
-    model.fit(X, y_enc, verbose=True)
+    if eval_file is not None:
+        if data_file.endswith(".pkl"):
+            df_eval = pickle.load(open(data_file, "rb"))
+        else:
+            df_eval = pd.read_csv(data_file)
+            
+        X_eval, y_eval_enc, num_labels = prepare_xgb_input(df_eval, le)
+        
+        # Fit with eval_set (X_val, y_val optional)
+        model.fit(
+            X, y_enc,
+            eval_set=[(X_eval, y_eval_enc)],  # or [(X_train, y_train), (X_val, y_val)]
+            verbose=True
+        )
+        
+    else:
+        model.fit(X, y_enc, verbose=True)
 
 # ==============
 # 4. Save model

@@ -124,10 +124,10 @@ if [ -z "${BATCH_SIZE:-}" ]; then
 
     echo "No batch size provided. Using default: $BATCH_SIZE"
 else
-    if [ "$TRAINING_ALGO" = "xgb" ]; then
-        echo "XGBoost does not support batch training. Exiting pipeline..."
-        exit 1
-    fi
+#     if [ "$TRAINING_ALGO" = "xgb" ]; then
+#         echo "XGBoost does not support batch training. Exiting pipeline..."
+#         exit 1
+#     fi
     sldata_path="$ROOT_DIR/data/16S_RNA/singlelabel/batches"
     BATCH="True"
 fi

@@ -172,7 +172,7 @@ if __name__ == "__main__":
                         # Load and merge all test batch files
                         tdf = pd.read_pickle(f)
                         tdfs.append(tdf)       
-                        f.unlink() 
+                        # f.unlink() 
                     except Exception as e:
                         print(f"❌ Failed to merge test batches into a dataframe!")
                         

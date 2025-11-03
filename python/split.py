@@ -166,13 +166,18 @@ if __name__ == "__main__":
                     except Exception as e:
                         print(f"❌ Failed to move {f} → {output_folder_train}: {e}")
                 
+                output_folder_test_batches = output_folder_test / 'batches'
+                output_folder_test_batches.mkdir(parents=True, exist_ok=True)
+                
                 tdfs = []
                 for f in test_data:
                     try:
                         # Load and merge all test batch files
                         tdf = pd.read_pickle(f)
-                        tdfs.append(tdf)       
-                        # f.unlink() 
+                        tdfs.append(tdf)   
+                        shutil.move(f, output_folder_test_batches / Path(f).name)
+                        #f.unlink()
+                        
                     except Exception as e:
                         print(f"❌ Failed to merge test batches into a dataframe!")
                         

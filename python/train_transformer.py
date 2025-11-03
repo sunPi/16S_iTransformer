@@ -22,6 +22,8 @@ import argparse
 from pathlib import Path
 from typing import List, Optional
 from utils import *
+import ast
+import matplotlib.pyplot as plt
 
 # ----------------------------
 # Dataset helper
@@ -62,6 +64,31 @@ class SimpleTransformerClassifier(nn.Module):
         x = x.squeeze(0)                     # [batch, d_model]
         return self.classifier(x)
 
+def plot_loss_curve(train_losses, val_losses=None, save_path="loss_curve.jpg"):
+    """
+    Plots training (and optional validation) loss and saves as JPG.
+
+    Args:
+        train_losses (list or array): Training loss per epoch
+        val_losses (list or array, optional): Validation loss per epoch
+        save_path (str): Path to save the plot (JPG)
+    """
+    plt.figure(figsize=(8, 6))
+    plt.plot(train_losses, label="Train Loss", marker='o')
+    
+    if val_losses is not None:
+        plt.plot(val_losses, label="Val Loss", marker='o')
+    
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title("Training Convergence")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300)  # Save as high-res JPG
+    plt.close()  # Close figure to avoid display in notebooks
+    print(f"Loss curve saved to {save_path}")
+    
 # ----------------------------
 # Training loop (supports both full and batch modes)
 # ----------------------------
@@ -74,16 +101,21 @@ def train_transformer(model: nn.Module,
                       test_loader: Optional[DataLoader] = None,
                       batch_files: Optional[List[Path]] = None,
                       batch_size: int = 32):
+        
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
-
+    
+    train_losses = []
+    val_losses = []
+    
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
         total_samples = 0
-
+        
+        
         print(f"\n=== Epoch {epoch+1}/{num_epochs} ===")
-
+        
         # MODE 1: standard DataLoader
         if batch_files is None:
             if train_loader is None:
@@ -97,7 +129,7 @@ def train_transformer(model: nn.Module,
             #     pass
             
             loader = train_loader  # already smaller than batch_size
-        
+
             for xb, yb in loader:
                 #print(f"Batch X shape: {xb.shape}, Batch Y shape: {yb.shape}")
                 xb, yb = xb.to(device), yb.to(device)
@@ -110,7 +142,8 @@ def train_transformer(model: nn.Module,
                 total_samples += xb.size(0)
         
             epoch_loss = running_loss / total_samples
-
+            train_losses.append(epoch_loss)
+            
         # MODE 2: iterate over saved batch files (each file is a DataFrame)
         else:
             for bf in batch_files:
@@ -149,8 +182,10 @@ def train_transformer(model: nn.Module,
 
             if total_samples == 0:
                 epoch_loss = float('nan')
+                train_losses.append(epoch_loss)
             else:
                 epoch_loss = running_loss / total_samples
+                train_losses.append(epoch_loss)
 
         # optional evaluation if test_loader provided
         if test_loader is not None:
@@ -174,7 +209,7 @@ def train_transformer(model: nn.Module,
         else:
             print(f"Epoch {epoch+1} - Loss: {epoch_loss:.4f}")
 
-    return model
+    return model, train_losses
 
 # ----------------------------
 # CLI: parse args and run
@@ -214,11 +249,20 @@ def main():
     train_loader = None
     test_loader  = None
     
-    config     = load_cfg()
+    #onfig     = load_cfg()
+    
+    config = Config('configurations')
+    config = config.read("config.cfg")
     
     ROOT_DIR = config["ROOT_DIR"]
     FNAME    = config["FNAME"]
     LABEL    = config["LABEL"]
+    
+    params = Config('parameters')
+    params = params.read("params.cfg")
+    
+    lr     = ast.literal_eval(params["LR"])
+    epochs = ast.literal_eval(params["EPOCHS"])
     
     # ===============================
     # MODE 1: Full dataset (no batching)
@@ -313,7 +357,7 @@ def main():
     # ===============================
     # TRAINING
     # ===============================
-    model = train_transformer(
+    model, train_losses = train_transformer(
         model=model,
         optimizer=optimizer,
         criterion=criterion,
@@ -326,14 +370,13 @@ def main():
     )
     
     # ===============================
-    # SAVE MODEL + CONFIG
+    # SAVE MODEL
     # ===============================
-    config = load_cfg()
-    ROOT_DIR = config["ROOT_DIR"]
     
     model_dir = Path(ROOT_DIR, 'results', 'models', LABEL, '16s_transformer', FNAME)
     os.makedirs(model_dir, exist_ok=True)
     
+    plot_loss_curve(train_losses, save_path = model_dir / "loss_curve.jpg") # Save the train/val loss curve
     torch.save(model.state_dict(), model_dir / "model.pth")
     with open(model_dir / "label_encoder.pkl", "wb") as f:
         pickle.dump(le, f)

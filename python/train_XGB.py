@@ -15,6 +15,7 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from xgboost import XGBClassifier
 from utils import *
 from eval_utils import *
+import ast
 
 # ==============
 # 1. Parse args
@@ -42,19 +43,27 @@ else:
 # data_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/silva_species/train/train_silva_species.pkl"
 # eval_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/silva_species/test/test_silva_species.pkl"
 
-data_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/batches/silva_species/train"
-eval_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/silva_species/test/test_silva_species.pkl"
+# data_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/batches/silva_species/train"
+# eval_file = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/data/16S_RNA/singlelabel/silva_species/test/test_silva_species.pkl"
 
-script_dir = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/python"
-label = "single"
-epochs = 100
-lr = 0.1
+# script_dir = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/python"
+# label = "single"
+# epochs = 100
+# lr = 0.1
+
+config = Config('configurations')
+config = config.read("config.cfg")
+
+ROOT_DIR = config["ROOT_DIR"]
+FNAME    = config["FNAME"]
+LABEL    = config["LABEL"]
+
+params = Config('parameters')
+params = params.read("params.cfg")
+
+lr     = ast.literal_eval(params["LR"])
+epochs = ast.literal_eval(params["EPOCHS"])
 depth = 6
-
-config     = load_cfg()
-ROOT_DIR   = config["ROOT_DIR"]
-FNAME      = config["FNAME"]
-LABEL      = config["LABEL"]
 
 file             = "test_" + FNAME + ".pkl"
 eval_file = Path(ROOT_DIR, 'data', '16S_RNA', LABEL, FNAME , 'test', file)
@@ -85,23 +94,24 @@ X, y_enc, num_labels = prepare_xgb_input(df, le)
 # 3. Train model
 # ==============
 if batch:
-    # Initialize XGBoost classifier
-    num_estimators_per_batch = 10
-    model = XGBClassifier(n_estimators=num_estimators_per_batch, random_state=42)
-    model.fit(X_train, y_train)
+    pass
+    # # Initialize XGBoost classifier
+    # num_estimators_per_batch = 10
+    # model = XGBClassifier(n_estimators=num_estimators_per_batch, random_state=42)
+    # model.fit(X_train, y_train)
 
-    # Train model in batches of rounds
-    for i in range(num_batches):
-        model.fit(X_train, y_train, xgb_model=model.get_booster())
+    # # Train model in batches of rounds
+    # for i in range(num_batches):
+    #     model.fit(X_train, y_train, xgb_model=model.get_booster())
     
-        # Make predictions on train and test data
-        y_train_pred = model.predict(X_train)
-        y_test_pred = model.predict(X_test)
+    #     # Make predictions on train and test data
+    #     y_train_pred = model.predict(X_train)
+    #     y_test_pred = model.predict(X_test)
     
-        # Calculate and print accuracy scores
-        train_accuracy = accuracy_score(y_train, y_train_pred)
-        test_accuracy = accuracy_score(y_test, y_test_pred)
-        print(f"Batch {i+1}/{num_batches} - Train Accuracy: {train_accuracy:.4f}, Test Accuracy: {test_accuracy:.4f}")
+    #     # Calculate and print accuracy scores
+    #     train_accuracy = accuracy_score(y_train, y_train_pred)
+    #     test_accuracy = accuracy_score(y_test, y_test_pred)
+    #     print(f"Batch {i+1}/{num_batches} - Train Accuracy: {train_accuracy:.4f}, Test Accuracy: {test_accuracy:.4f}")
 
 else:
     model = XGBClassifier(
@@ -148,6 +158,7 @@ with open(Path(model_dir, "xgboost_model.pkl"), "wb") as f:
     pickle.dump(model, f)
 with open(Path(model_dir, "label_encoder.pkl"), "wb") as f:
     pickle.dump(le, f)
+print("✅ XGBoost model saved to " + model_dir.as_posix())
 
 # Suppose you already have X_eval, y_eval, and trained model
 metrics = evaluate_model(
@@ -158,4 +169,4 @@ metrics = evaluate_model(
     output_dir=model_dir
 )
 
-print("✅ XGBoost model saved to " + model_dir.as_posix())
+

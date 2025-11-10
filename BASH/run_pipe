@@ -198,10 +198,14 @@ if [ "${BATCH:-}" = "False" ]; then
           if [ -f "$file" ]; then
             echo "Training on $file.."
 
-            python3 "$train" -t "$file"
-            MODEL_DIR=$(python3 "$gen_model_dir")
-            python3 "$evaluate" -m "$MODEL_DIR"  
-
+            if [ TRAINING_ALGO = "itransformer" ]; then
+                python3 "$train" -t "$file"
+                MODEL_DIR=$(python3 "$gen_model_dir")
+                python3 "$evaluate" -m "$MODEL_DIR"  
+            else
+                python3 "$train" -t "$file"
+            fi
+            
           fi
         done
       fi

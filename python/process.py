@@ -8,13 +8,12 @@ from utils import *
 from pathlib import Path
 from collections import Counter
 import ast
+from kmers import *
 
 # ========================
 # 1. Functions
 # ========================
-# Loader Function
-
-        
+# Loader Function      
 def load_silva_fasta(fasta_path, n_max=None):
     def inspect_fasta(fasta_path):
         # Read sequences
@@ -78,6 +77,21 @@ def one_hot_encode(seq, max_len):
         idx = mapping.get(base.upper(), 4)
         arr[i, idx] = 1.0
     return arr  # shape [seq_len, 5]
+
+# def generate_kmers(fasta_handle):
+#     from kmers import generate_kmers
+
+#     for rec in SeqIO.parse(fasta_handle, "fasta"):
+#         seq = str(rec.seq)
+#         kmers = generate_kmers(seq, k=7)
+    
+#         records.append({
+#             "SampleID": accession,
+#             "kmers": kmers,
+#             "genus": genus,
+#             "species": species,
+#             ...
+#         })
 
 def encode_dataframe(df, max_len):
     # produce 3D array: [samples, max_len, 5]
@@ -244,10 +258,15 @@ if __name__ == "__main__":
     ########### Parse arguments
     args = parser.parse_args()
     # script_dir = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer/python"
-    # ROOT_DIR = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/"
-    # fasta_file = ROOT_DIR + "data/16S_RNA/SILVA_138.2_SSURef_NR99_tax_silva.fasta"
+    # ROOT_DIR = "/home/jr453/Documents/Projects/Reem_16s_RNA_classification/16S_iTransformer"
+    # fasta_file = ROOT_DIR + "/data/16S_RNA/SILVA_138.2_SSURef_NR99_tax_silva.fasta"
+    # n_max = 100
+    # levels = 'species'
+    # batch_size = 10
+
+    config = Config('configurations')
+    config = config.read("config.cfg")
     
-    config = load_cfg()
     ROOT_DIR = config["ROOT_DIR"]
     VERBOSE  = ast.literal_eval((config["VERBOSE"]))
     config["LABEL"] = "singlelabel"
@@ -268,25 +287,17 @@ if __name__ == "__main__":
         batch_size = None
     else:
         batch_size = int(batch_size)
-        
-    ########### Load In Fasta File
-    print("Loading SILVA fasta...")
-    df = load_silva_fasta(fasta_file, n_max=n_max)
-    
-    if(VERBOSE):
-        print(df.head())
-        print(df.shape)  
     
     # per-level
-    out_prefix = ROOT_DIR + "/data/16S_RNA/singlelabel/silva"
-    os.makedirs(os.path.dirname(out_prefix), exist_ok=True)
+    # out_prefix = ROOT_DIR + "/data/16S_RNA/singlelabel/silva_kmers_test"
+    # os.makedirs(out_prefix, exist_ok=False)
     
     taxa_levels = ["kingdom", "phylum", "class", "order", "family", "genus", "species"]
     
     ########### Ensure taxonomy levels are handled correctly
     # If no specific levels requested, process all
     if levels is None: # If user doest not specify to process a specific level
-        levels = taxa_levels
+        levels           = taxa_levels
         config["LEVELS"] = levels
         update_config(config)
         
@@ -303,6 +314,47 @@ if __name__ == "__main__":
         levels = [lvl for lvl in levels if lvl in taxa_levels] # If a user requests only one level
         config["LEVELS"] = levels
         update_config(config)
+    
+    ########### Load In Fasta File
+    print("Loading SILVA fasta...")
+    df = load_silva_fasta(fasta_file, n_max=n_max)
+    
+    if(VERBOSE):
+        print(df.head())
+        print(df.shape)
+    
+    ########### KMERS DEVVVVVVVV #################
+    # from kmers import generate_kmers
+    # records = []
+    
+    # with open(fasta_file, "r") as fasta_handle:
+    #     for rec in SeqIO.parse(fasta_handle, "fasta"):
+    #         seq = str(rec.seq)
+    #         kmers = generate_kmers(seq, k=6)
+    #         break
+        
+    #         # Split taxonomy from description
+    #         parts = rec.description.split(" ", 1)
+    #         taxonomy = parts[1].split(";") if len(parts) > 1 else ["Unclassified"]
+            
+    #         # Pad taxonomy to 7 levels
+    #         tax_levels = taxonomy + ["Unclassified"] * 7
+    #         tax_dict = dict(zip(
+    #             ["kingdom", "phylum", "class", "order", "family", "genus", "species"],
+    #             tax_levels[:7]
+    #         ))
+            
+    #         # Only keep the requested levels
+    #         selected_tax = {lvl: tax_dict[lvl] for lvl in levels}
+            
+    #         # Build record dynamically
+    #         record = {
+    #             "SampleID": parts[0],
+    #             "kmers": kmers,
+    #             **selected_tax  # <- unpack dynamic taxonomy keys
+    #         }
+            
+    #         records.append(record)
     
     ########### Process Fasta File and Build single/multi-label DF
     if batch_size is not None: # Process in batches
